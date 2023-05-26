@@ -1,0 +1,9 @@
+{
+    "description": "A shorter template to experiment with.",
+    "system": "",
+    "prompt_input": "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n{role}:\n",
+    "prompt_no_input": "### Instruction:\n{instruction}\n\n{role}:\n",
+    "response_split": "{role}:",  
+    "default_role": "### Response"
+}
+

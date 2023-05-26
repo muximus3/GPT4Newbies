@@ -1,0 +1,8 @@
+{
+    "description": "we add system message and role",
+    "system": "Now you are a {role}.",
+    "prompt_input": "\n\nHuman:\n{instruction}\n{input}\n\n{role}:\n",
+    "prompt_no_input": "\n\nHuman:\n{instruction}\n\n{role}:\n",
+    "response_split": "{role}:",    
+    "default_role": "Assistant"
+}
