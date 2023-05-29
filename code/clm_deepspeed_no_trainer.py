@@ -28,7 +28,7 @@ import fire
 import wandb
 sys.path.append(os.path.normpath(f'{os.path.dirname(os.path.abspath(__file__))}/..'))
 logger = logging.getLogger(__name__)
-from data_util import prebuild_tokenizer, load_tokenized_dataset
+from code.tokenizer_utils import prebuild_tokenizer, load_tokenized_dataset
 
 torch.backends.cuda.matmul.allow_tf32 = True
 

@@ -235,21 +235,4 @@ def load_dataset_from_paths(
     )
     return raw_datasets
 
-def df_reader(data_path, header: int | None = 0, usecols: list[str | int] | None = None ,sep='\t', sheet_name=0) -> pd.DataFrame:
-    extention = data_path.split('.')[-1]
-    match extention:
-        case 'jsonl':
-            df_data = pd.read_json(data_path, lines=True)
-        case 'json':
-            df_data = pd.read_json(data_path)
-        case 'xlsx':
-            df_data = pd.read_excel(data_path,header=header, usecols=usecols, sheet_name=sheet_name)
-        case 'csv' | 'tsv':
-            df_data = pd.read_csv(data_path, header=header, usecols=usecols, sep=sep)
-        case 'pkl':
-            df_data = pd.read_pickle(data_path)
-        case 'parquet':
-            df_data = pd.read_parquet(data_path)
-        case _:
-            raise AssertionError(f'not supported file type:{data_path}, suport types: json, jsonl, xlsx, csv, parquet, pkl')
-    return df_data
+
