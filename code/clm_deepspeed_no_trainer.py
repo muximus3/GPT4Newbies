@@ -28,7 +28,7 @@ import fire
 import wandb
 sys.path.append(os.path.normpath(f'{os.path.dirname(os.path.abspath(__file__))}/..'))
 logger = logging.getLogger(__name__)
-from code.tokenizer_utils import prebuild_tokenizer, load_tokenized_dataset
+from tokenizer_utils import prebuild_tokenizer, load_tokenized_dataset
 
 torch.backends.cuda.matmul.allow_tf32 = True
 
@@ -254,9 +254,9 @@ def train(accelerator, config: TrainArgs):
 
             if (step + 1) % config.print_loss_every == 0:
                 accelerator.print(f'Epoch:{epoch}, step:{step}, loss:{train_loss.compute()}')
-            if step > 0 and step % config.save_every == 0:
-                curr_step = step + epoch * len(train_dataloader)
-                accelerator.save_state(f"{config.output_dir}/step_{curr_step}")
+            # if step > 0 and step % config.save_every == 0:
+            #     curr_step = step + epoch * len(train_dataloader)
+            #     accelerator.save_state(f"{config.output_dir}/step_{curr_step}")
 
             if step > 0 and (step % config.eval_every == 0 or step == len(train_dataloader) - 1):
                 val_loss = evaluate(model, val_dataloader, accelerator)
