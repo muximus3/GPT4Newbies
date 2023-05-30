@@ -16,9 +16,9 @@ import torch
 import torch.nn as nn
 from accelerate import Accelerator
 from accelerate.utils import DummyScheduler, DummyOptim, set_seed
+from deepspeed.accelerator import get_accelerator
 from peft import get_peft_model, LoraConfig, TaskType, prepare_model_for_int8_training
 from tqdm import tqdm
-from accelerate import Accelerator
 from torchmetrics import MeanMetric
 from torch.utils.data import DataLoader
 from transformers import DefaultDataCollator, LlamaForCausalLM, LlamaTokenizer
@@ -188,21 +188,20 @@ def train(accelerator, config: TrainArgs):
 
 
     if accelerator.state.deepspeed_plugin is None or "scheduler" not in accelerator.state.deepspeed_plugin.deepspeed_config:
-        # accelerator.print('liner schedule')
         # scheduler = get_linear_schedule_with_warmup(
         #     optimizer=optimizer,
         #     num_warmup_steps=config.warmup_steps,
         #     num_training_steps=total_num_steps,
         # )
         accelerator.print('cosine schedule')
-        scheduler = get_scheduler(
-            name="cosine",
+        scheduler = get_cosine_schedule_with_warmup(
             optimizer=optimizer,
             num_warmup_steps=config.warmup_steps * accelerator.num_processes,
             num_training_steps=total_num_steps,
         )
     else:
         # no decay 
+        accelerator.print('dummy schedule')
         scheduler = DummyScheduler(optimizer, total_num_steps=config.warmup_steps, warmup_num_steps=config.warmup_steps)
 
     model, optimizer, train_dataloader, val_dataloader, scheduler = accelerator.prepare(
@@ -277,10 +276,12 @@ def train(accelerator, config: TrainArgs):
                 accelerator.print(format_metrics(log_val, "val", f" step {step} "))
 
                 train_loss.reset()
+        get_accelerator().empty_cache()
+            
             
 
         accelerator.print(f"Epoch {epoch} finished")
-        accelerator.print(f"Pushing to HF hub")
+        accelerator.print(f"Saving checkpoint hub")
         accelerator.wait_for_everyone()
         unwrapped_model = accelerator.unwrap_model(model)
         # try:
