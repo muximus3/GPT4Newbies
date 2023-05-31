@@ -83,12 +83,11 @@ class Prompter(object):
 
             
 # if __name__ == "__main__":
-    # p = Prompter('../experiments_dialog_v2/templates/system_role_en.json')
-#     print(p.generate_prompt('hello follow', 'a + b', role=''))
+#     p = Prompter('templates/system_role_zh.json')
+#     print(p.user_prompt('hello follow', 'a + b', role=''))
 #     print('-' * 20)
-    # print(p.full_prompt('hello follow', 'a + b', 'c', role='Helpful Sci'))
-    # print(p.user_prompt('hello follow', 'a + b', role=''))
+#     print(p.user_prompt('hello follow', 'a + b', role=''))
 #     print('-' * 20)
 #     print(p.format_response('hello coder'))
 #     print('-' * 20)
-#     print(p.format_response('hello helpful coder Assistant: sdf: a helpful ### Response: f: coder sdfs helpful coder: ', role=''))
+#     print(p.format_response('hello helpful coder Assistant: sdf: a helpful ### Re AI助手:sponse: f: coder sdfs helpful coder: ', role=''))

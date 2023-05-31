@@ -94,7 +94,8 @@ input_sentences = [
          "Everyone is happy and I can",
          "The new movie that got Oscar this year",
          "In the far far distance from our galaxy,",
-         "Peace is the only way"
+         "Peace is the only way",
+         "你现在是算法专家，智商有180，假如今天是星期一，49天后是星期几"
 ]
 
 if args.batch_size > len(input_sentences):
