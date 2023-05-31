@@ -15,7 +15,7 @@ def main(prompt, model_name_or_path, tokenizer_name_or_path, world_size=8):
     local_rank = int(os.getenv('LOCAL_RANK', '0'))
     world_size = int(os.getenv('WORLD_SIZE', world_size))
     generator = pipeline('text-generation', model=model_name_or_path, tokenizer=tokenizer_name_or_path,
-                        device=local_rank)
+                        device="auto")
 
     generator.model = deepspeed.init_inference(generator.model,
                                             mp_size=world_size,
