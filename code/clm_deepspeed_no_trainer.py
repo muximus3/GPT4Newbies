@@ -27,6 +27,7 @@ from torch.utils.data import DataLoader
 from transformers import DefaultDataCollator, LlamaForCausalLM, LlamaTokenizer
 from pydantic import BaseModel
 from typing import Union, List
+import math
 import fire
 import wandb
 
@@ -189,7 +190,7 @@ def train(accelerator, config: TrainArgs):
         * accelerator.num_processes
         * gradient_accumulation_steps
     )
-    steps_per_epoch = dataset_size // (config.micro_batch_size * accelerator.num_processes)
+    steps_per_epoch = math.ceil(dataset_size / (config.micro_batch_size * accelerator.num_processes))
     total_num_steps = steps_per_epoch * config.num_epochs
     # instead of decaying to zero, decay to ratio of min_lr / lr
     total_num_steps += int(total_num_steps * lr_ratio) + config.warmup_steps

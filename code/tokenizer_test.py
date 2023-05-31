@@ -156,84 +156,6 @@ def test_tokenizer(
     print_special_token(tokenizer)
     print(f'old: {old_len}, new:{new_len}')
 
-        
-    
-
-def main_belle(
-    dataset_paths: list[str],
-    tokenizer: transformers.PreTrainedTokenizer,
-    cutoff_len: int,
-    train_on_inputs: bool,
-    sample_ids: list,
-    prompt_template_file_name:str
-):
-    tokenizer.pad_token_id = 0 
-    tokenizer.padding_side = "left" 
-
-    def tokenize(prompt, add_eos_token=True):
-        result = tokenizer(
-            prompt,
-            truncation=True,
-            max_length=cutoff_len,
-            padding=False,
-            return_tensors=None,
-        )
-        print(f'{result["input_ids"][-1]}, {len(result["input_ids"])} cutofflen:{cutoff_len}')
-        # 没有eos token 有pad就append一个 eos token
-        if (
-            result["input_ids"][-1] != tokenizer.eos_token_id
-            and len(result["input_ids"]) < cutoff_len
-            and add_eos_token
-        ):
-            print(f'padd')
-            result["input_ids"].append(tokenizer.eos_token_id)
-            result["attention_mask"].append(1)
-        # 没有eos token 有trauncation，最后一个token设置为eos_id
-        if add_eos_token and len(result["input_ids"]) >= cutoff_len:
-            print(f'trancat')
-            result["input_ids"][cutoff_len - 1] = tokenizer.eos_token_id
-            result["attention_mask"][cutoff_len - 1] = 1
-
-        result["labels"] = result["input_ids"].copy()
-
-        return result
-
-    def generate_and_tokenize_prompt(data_point):
-        instruction = data_point['instruction']
-        input_text = data_point["input"]
-        input_text = "Human: " + instruction + input_text + "\n\nAssistant: " 
-        input_text = tokenizer.bos_token + input_text if tokenizer.bos_token!=None else input_text
-        target_text = data_point["output"] + tokenizer.eos_token
-        full_prompt = input_text+target_text
-        tokenized_full_prompt = tokenize(full_prompt)
-        if not train_on_inputs:
-            user_prompt = input_text
-            tokenized_user_prompt = tokenize(user_prompt, add_eos_token=False)
-            user_prompt_len = len(tokenized_user_prompt["input_ids"])
-            
-            tokenized_full_prompt["labels"] = [
-                -100
-            ] * user_prompt_len + tokenized_full_prompt["labels"][
-                user_prompt_len:
-            ] 
-        return tokenized_full_prompt
-
-        
-    raw_datasets = load_dataset('json', data_files= dataset_paths)
-    dataset = raw_datasets['train'].select(sample_ids).map(generate_and_tokenize_prompt,
-                                                                    remove_columns=raw_datasets["train"].column_names,
-                                                        )
-    data_collator = transformers.DataCollatorForSeq2Seq(
-            tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True
-        )
-    data_loader = DataLoader(dataset, collate_fn=data_collator, batch_size=2)
-    data_loader_iter = iter(data_loader)
-    for i in range(len(data_loader_iter)):
-        batch = next(data_loader_iter)
-        print_sample(batch, tokenizer)
-    print_special_token(tokenizer)
-
-
 
 def main(
     token_lib: str,
@@ -251,7 +173,7 @@ def main(
     # tokenizer = AutoTokenizer.from_pretrained(base_model)
     tokenizer = LlamaTokenizer.from_pretrained(base_model)
 
-    args = {
+    kargs = {
         "dataset_paths": dataset_paths, 
         "tokenizer": tokenizer, 
         "cutoff_len": cut_off_len,
@@ -259,14 +181,8 @@ def main(
         "sample_ids": sample_ids,
         "prompt_template_file_name": prompt_template_file_name
         }
-    if token_lib == 'alpaca_lora':
-        main_lora_xiaoduo(**args)
-    elif token_lib == 'gpt4all':
-        main_gpt4all(**args)
-    elif token_lib == 'belle':
-        main_belle(**args)
-    else:
-        raise AssertionError(f'token lib not found: {token_lib}')
+    print(kargs)
+    test_tokenizer(**kargs)
 
 
 if __name__ == "__main__":
