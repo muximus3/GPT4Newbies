@@ -7,7 +7,9 @@ import torch
 import logging
 import gradio as gr
 from peft import PeftModel
+import time
 import json
+import fcntl
 import fire
 import transformers
 from tqdm import tqdm
@@ -204,8 +206,14 @@ def main(
             data_point['output'] = format_out 
             data_point['model'] = model_name
             data_point['generation_setting'] = generation_config.to_diff_dict()
-            w.write(json.dumps(data_point, ensure_ascii=False) + "\n")
-            w.flush()
+            fcntl.flock(writer, fcntl.LOCK_EX)
+            try:
+                writer.write(json.dumps(data_point, ensure_ascii=False) + "\n")
+                writer.flush()
+                time.sleep(0.1)
+            finally:
+                fcntl.flock(writer, fcntl.LOCK_UN)
+        print(f'formatted_output:\n{format_out}')
         return format_out
 
     if test_data_path and os.path.isfile(test_data_path):
@@ -219,7 +227,7 @@ def main(
             else:
                 left_msgs = total_msgs
         if test_output_file:
-            w = open(test_output_file, "a+")
+            writer = open(test_output_file, "a+")
         for item in left_msgs:
             evaluate(item)
     else:
