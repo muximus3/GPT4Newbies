@@ -213,7 +213,6 @@ def main(
                 time.sleep(0.1)
             finally:
                 fcntl.flock(writer, fcntl.LOCK_UN)
-        print(f'formatted_output:\n{format_out}')
         return format_out
 
     if test_data_path and os.path.isfile(test_data_path):
