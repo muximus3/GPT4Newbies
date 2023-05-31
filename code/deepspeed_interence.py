@@ -11,6 +11,7 @@ sys.path.append(os.path.normpath(f'{os.path.dirname(os.path.abspath(__file__))}/
 logger = logging.getLogger(__name__)
 
 def main(prompt, model_name_or_path, world_size=8):
+    print('================>')
     local_rank = int(os.getenv('LOCAL_RANK', '0'))
     world_size = int(os.getenv('WORLD_SIZE', world_size))
     generator = pipeline('text-generation', model=model_name_or_path,
@@ -22,6 +23,7 @@ def main(prompt, model_name_or_path, world_size=8):
                                             replace_with_kernel_inject=True)
 
     string = generator(prompt, do_sample=True, min_length=250)
+    print(f'================>{string}')
     if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
         print(string)
 
