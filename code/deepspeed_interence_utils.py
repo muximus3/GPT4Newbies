@@ -18,6 +18,7 @@ class DSPipeline():
     '''
     def __init__(self,
                  model_name='bigscience/bloom-3b',
+                 tokenizer_name='',
                  dtype=torch.float16,
                  is_meta=True,
                  device=-1,
@@ -38,7 +39,7 @@ class DSPipeline():
         # the Deepspeed team made these so it's super fast to load (~1 minute), rather than wait 10-20min loading time.
         self.tp_presharded_models = ["microsoft/bloom-deepspeed-inference-int8", "microsoft/bloom-deepspeed-inference-fp16"]
 
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, padding_side="left")
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, padding_side="left")
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
         if (is_meta):
