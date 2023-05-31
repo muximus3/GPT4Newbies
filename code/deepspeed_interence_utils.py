@@ -55,7 +55,7 @@ class DSPipeline:
         )
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        if is_meta and checkpoint_path:
+        if is_meta:
             """When meta tensors enabled, use checkpoints"""
             self.config = AutoConfig.from_pretrained(self.model_name)
             self.repo_root, self.checkpoints_json = self._generate_json(checkpoint_path)
