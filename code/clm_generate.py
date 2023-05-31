@@ -274,7 +274,7 @@ def main(
             ],
             title="🦙🌲 Alpaca-LoRA-XiaoDuo-v0.1",
             description=f"基于 7B LLaMA 模型:{lora_weights}",
-        ).queue().launch(server_name="0.0.0.0", share=share_gradio)
+        ).queue().launch(server_name=server_name, share=share_gradio)
 
 
 
