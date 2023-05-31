@@ -124,54 +124,9 @@ def print_special_token(tokenizer_hf: transformers.PreTrainedTokenizer):
           all_special:{tokenizer_hf.all_special_tokens},{tokenizer_hf.all_special_ids},
           """)
 
-def main_gpt4all(
-    dataset_paths: list[str],
-    tokenizer: transformers.PreTrainedTokenizer,
-    cutoff_len: int,
-    train_on_inputs: bool,
-    sample_ids:list,
-    prompt_template_file_name:str
-):
-
-    if tokenizer.pad_token is None:
-        tokenizer.add_special_tokens(
-            {
-                "bos_token": DEFAULT_BOS_TOKEN,
-                "eos_token": DEFAULT_EOS_TOKEN,
-                "pad_token": DEFAULT_PAD_TOKEN
-            }
-        )
-    prompter = Prompter(template_file_path=prompt_template_file_name)
-    raw_datasets = load_dataset('json', data_files= dataset_paths)
-    def map_data(data):
-        print(data)
-        prompts = []
-        outputs = []
-        for instruction, input_str, output in zip(data['instruction'],data['input'],data['output']):
-            prompts.append(prompter.user_prompt(instruction,input_str))
-            outputs.append(output)
-        return {'prompt': prompts, 'response': outputs}
-    # data = tokenize_inputs({'max_length': cutoff_len}, tokenizer=tokenizer, examples=examples)
-    config = {'max_length': cutoff_len, 'batch_size': 2}
-    # tokenize inputs and return labels and attention mask
-    train_dataset = raw_datasets['train'].select(sample_ids).map(
-        lambda ele: tokenize_inputs(config, tokenizer, map_data(ele)),
-        batched=True,
-        remove_columns=raw_datasets["train"].column_names,
-    )
-    train_dataloader = DataLoader(
-        train_dataset,
-        collate_fn=transformers.DefaultDataCollator(),
-        batch_size=config["batch_size"],
-    )
-    for step, batch in enumerate(train_dataloader):
-        print_sample(batch, tokenizer)
-    print_special_token(tokenizer)
-
-          
 
 
-def main_lora_xiaoduo(
+def test_tokenizer(
     dataset_paths: list[str],
     tokenizer: transformers.PreTrainedTokenizer,
     cutoff_len: int,
