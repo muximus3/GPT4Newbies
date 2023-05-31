@@ -35,42 +35,6 @@ try:
 except:
     pass
 
-
-"""
-deep speed load from base model + state dict
-CUDA_VISIBLE_DEVICES="0" python clm_lora_peft_llama_generate.py \
---state_dict_path /data/zhangchong/sft_models/ds_llama7b-gpt4-10w-20230522/step_2400_torch_ep0.8 \
---test_data_path /data/zhangchong/test_data/test_data_with_target.jsonl \
---test_output_file test_outputs/test_v0.9_ds_7bllama_gpt4_10w_cp2400_ep0.8_topk10.jsonl \
---model_name_or_path /data/zhangchong/llm_models/llama-7b-hf \
---load_8bit False \
---lora False \
---template_file ./templates/alpaca_lora.json > test_llama7b_ds_gpt4_10wdata_cp2400_topk10_v0.9 2>&1 &
-
-deep speed load from a checkpoint shards + tokenizer
-CUDA_VISIBLE_DEVICES="4" python clm_lora_peft_llama_generate.py \
---test_data_path /data/zhangchong/test_data/test_data_with_target_xd.jsonl \
---test_output_file test_outputs/test_v0.1_xd_ds_7bllama_gpt4_10w_cp3150_ep1_topk10.jsonl \
---model_name_or_path /data/zhangchong/sft_models/ds_llama7b-gpt4-10w-20230522/epoch_0 \
---tokenizer_name_or_path /data/zhangchong/llm_models/llama-7b-hf \
---load_8bit False \
---lora False \
---template_file ./templates/alpaca_lora.json > test_llama7b_ds_gpt4_10wdata_cp3150_topk10_v0.1_xd 2>&1 &
-
-
-lora 8bit
-CUDA_VISIBLE_DEVICES="0" python clm_lora_peft_llama_generate.py \
---lora_weights ./results/lora-alpaca-llama65b-gpt4-zh5w-20230522/checkpoint-2400 \
---test_data_path /data/zhangchong/test_data/test_data_with_target_xd.jsonl \
---test_output_file test_outputs/test_v0.1_xd_lora_65bllama_gpt4_zh5w_cp2400_topk10.jsonl \
---model_name_or_path /data/zhangchong/llm_models/llama-65b \
---load_8bit True \
---lora True \
---template_file ./templates/alpaca_lora.json > test_logs/test_llama65b_lora_gpt4_zh5wdata_cp2400_toppk10_v0.1_xd 2>&1 &
-
-"""
-
-
 def main(
     test_data_path: str = None,
     load_8bit: bool = False,
