@@ -6,15 +6,19 @@ import logging
 import deepspeed
 import fire
 import torch
-from transformers import pipeline
+from transformers import pipeline, LlamaForCausalLM
 sys.path.append(os.path.normpath(f'{os.path.dirname(os.path.abspath(__file__))}/..'))
 logger = logging.getLogger(__name__)
 
 def main(prompt, model_name_or_path, tokenizer_name_or_path, world_size=8):
     print('================>')
-    local_rank = int(os.getenv('LOCAL_RANK', '0'))
     world_size = int(os.getenv('WORLD_SIZE', world_size))
-    generator = pipeline('text-generation', model=model_name_or_path, tokenizer=tokenizer_name_or_path,
+    model = LlamaForCausalLM.from_pretrained(
+    model_name_or_path,
+    torch_dtype=torch.bfloat16,
+    device_map="auto",
+    )
+    generator = pipeline('text-generation', model=model, tokenizer=tokenizer_name_or_path,
                         device="cuda")
 
     generator.model = deepspeed.init_inference(generator.model,

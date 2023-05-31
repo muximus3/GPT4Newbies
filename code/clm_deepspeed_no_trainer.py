@@ -101,7 +101,7 @@ def evaluate(model, val_dataloader, accelerator):
 
 def train(accelerator, config: TrainArgs):
     set_seed(config.seed)
-
+    accelerator.free_memory()
     accelerator.print(config)
     accelerator.print(f"Using {accelerator.num_processes} GPUs")
 
