@@ -207,16 +207,19 @@ def load_dataset_from_paths(
             raw_dataset = raw_dataset.rename_columns(
                 {"input": "instruction", "target": "output", "kind": "category"}
             )
+            raw_dataset = raw_dataset.add_column("input", [""] * len(raw_dataset))
         # belle data format
         elif len({"input", "target"} - set(raw_dataset.column_names)) == 0:
             raw_dataset = raw_dataset.rename_columns(
                 {"input": "instruction", "target": "output"}
             )
+            raw_dataset = raw_dataset.add_column("input", [""] * len(raw_dataset))
         # gpt4all data format
         elif len({"prompt", "response"} - set(raw_dataset.column_names)) == 0:
             raw_dataset = raw_dataset.rename_columns(
                 {"prompt": "instruction", "response": "output"}
             )
+            raw_dataset = raw_dataset.add_column("input", [""] * len(raw_dataset))
         else:
             raise KeyError(
                 f"Data format error: {dataset_path}, columns: {raw_dataset.column_names}"
@@ -227,7 +230,7 @@ def load_dataset_from_paths(
         raw_datasets = raw_datasets_list[0]
     else:
         raw_datasets = concatenate_datasets(raw_datasets_list)
-    assert len({"instruction", "input", "output"} - set(raw_datasets.column_names)) == 0
+    assert len({"instruction", "input", "output"} - set(raw_datasets.column_names)) == 0, raw_datasets.column_names
     raw_datasets = raw_datasets.filter(
         lambda example: example["instruction"] != "" and len(example["output"]) > 0,
         num_proc=min(mp.cpu_count() - 1, 16),
