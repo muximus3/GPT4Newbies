@@ -209,23 +209,24 @@ def train(accelerator, config: TrainArgs):
         accelerator.state.deepspeed_plugin is None
         or "scheduler" not in accelerator.state.deepspeed_plugin.deepspeed_config
     ):
-        # scheduler = get_linear_schedule_with_warmup(
-        #     optimizer=optimizer,
-        #     num_warmup_steps=config.warmup_steps,
-        #     num_training_steps=total_num_steps,
-        # )
+        accelerator.print("linear schedule")
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer=optimizer,
+            num_warmup_steps=config.warmup_steps * accelerator.num_processes,
+            num_training_steps=total_num_steps,
+        )
         # scheduler = get_scheduler(
         #     name=config.lr_scheduler_type,
         #     optimizer=optimizer,
         #     num_warmup_steps=config.warmup_steps * accelerator.num_processes,
         #     num_training_steps=total_num_steps,
         # )
-        accelerator.print("cosine schedule")
-        scheduler = get_cosine_schedule_with_warmup(
-            optimizer=optimizer,
-            num_warmup_steps=config.warmup_steps * accelerator.num_processes,
-            num_training_steps=total_num_steps,
-        )
+        # accelerator.print("cosine schedule")
+        # scheduler = get_cosine_schedule_with_warmup(
+        #     optimizer=optimizer,
+        #     num_warmup_steps=config.warmup_steps * accelerator.num_processes,
+        #     num_training_steps=total_num_steps,
+        # )
     else:
         # Using deepspeed with config file
         accelerator.print("dummy schedule")
