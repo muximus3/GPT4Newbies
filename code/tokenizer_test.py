@@ -170,8 +170,8 @@ def main(
     assert base_model, (
         "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
     )
-    tokenizer = AutoTokenizer.from_pretrained(base_model)
-    # tokenizer = LlamaTokenizer.from_pretrained(base_model)
+    # tokenizer = AutoTokenizer.from_pretrained(base_model)
+    tokenizer = LlamaTokenizer.from_pretrained(base_model)
 
     kargs = {
         "dataset_paths": dataset_paths, 
