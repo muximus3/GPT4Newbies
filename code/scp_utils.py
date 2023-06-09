@@ -125,7 +125,7 @@ async def copy_directory(src_path, dest_path, conn, sftp,chunk_size, direction):
                 await copy_directory(local_item, remote_item, conn, sftp, chunk_size, direction)
     else:
         os.makedirs(dest_path, exist_ok=True)
-        async for entry in sftp.listdir(src_path):
+        async for entry in await sftp.listdir(src_path):
             remote_item = os.path.join(src_path, entry.filename)
             local_item = os.path.join(dest_path, entry.filename)
 
