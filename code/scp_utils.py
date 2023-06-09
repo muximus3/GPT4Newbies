@@ -155,8 +155,8 @@ async def async_scp(src_path, dest_path, host, port, username, password, chunk_s
 
 
 async def scp_main(
-    local_path="path/to/local/file",
-    remote_path="path/to/remote/file",
+    src_path="path/to/local/file",
+    dest_path="path/to/remote/file",
     host="example.com",
     port=22,
     username="your_username",
@@ -166,13 +166,13 @@ async def scp_main(
 ):
     if direction not in ("local_to_remote", "remote_to_local", "l2r", "r2l"):
         raise ValueError("Invalid direction, must be 'local_to_remote' or 'remote_to_local' or 'l2r' or 'r2l'")
-    await async_scp(local_path, remote_path, host, port, username, password, chunk_size, direction)
+    await async_scp(src_path, dest_path, host, port, username, password, chunk_size, direction)
 
 
 def main(
 **kwargs
 ):
-    print(f'Scp task: \nFrom:{kwargs["local_path"]}\nTo=>:{kwargs["remote_path"]}\nHost:{kwargs["host"]}\nUsername:{kwargs["username"]}\nPassword:{kwargs["password"]}\n')
+    print(f'Scp task: \nFrom:{kwargs["src_path"]}\nTo=>:{kwargs["dest_path"]}\nHost:{kwargs["host"]}\nPort:{kwargs["port"]}\nUsername:{kwargs["username"]}\nPassword:{kwargs["password"]}\n')
     print('Start scp task')
     asyncio.run(scp_main(**kwargs))
 
