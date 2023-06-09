@@ -8,6 +8,8 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+.vscode
+code/wandb/
 build/
 develop-eggs/
 dist/
