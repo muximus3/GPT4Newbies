@@ -336,14 +336,6 @@ def train(accelerator, config: TrainArgs):
         )
 
     accelerator.wait_for_everyone()
-    unwrapped_model = accelerator.unwrap_model(model)
-    unwrapped_model.save_pretrained(
-        f"{config.output_dir}/final",
-        is_main_process=accelerator.is_main_process,
-        save_function=accelerator.save,
-        state_dict=accelerator.get_state_dict(model),
-    )
-
     accelerator.end_training()
 
 
