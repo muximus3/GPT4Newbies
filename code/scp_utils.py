@@ -32,19 +32,20 @@ async def transfer_file(
     src_path, dest_path, conn, sftp, chunk_size, direction, progress_bar=True
 ):
     # 获取源文件和目标文件的大小
+    # from local to remote
     if is_local_to_remote(direction):
         src_size_bytes = os.path.getsize(src_path)
         try:
-            dest_size = await conn.run(f"stat -c %s {dest_path}", check=True)
-            dest_size_bytes = int(dest_size.stdout.strip())
-            print(sftp.getsize(dest_size))
+            dest_size_bytes = await sftp.getsize(dest_path)
         except asyncssh.ProcessError:
             dest_size_bytes = 0
+    # from remote to local
     else:
-        dest_size_bytes = os.path.getsize(dest_path) 
-        remote_file_size = await conn.run(f"stat -c %s {src_path}", check=True)
-        src_size_bytes = int(remote_file_size.stdout.strip())
-        print(sftp.getsize(src_path))
+        try: 
+            dest_size_bytes = os.path.getsize(dest_path) 
+        except FileNotFoundError:
+            dest_size_bytes = 0
+        src_size_bytes = await sftp.getsize(src_path)
 
     print(f'Source file: {src_path}')
     print(f'Source file size: {pretty_file_size(src_size_bytes)}')
@@ -115,24 +116,31 @@ async def copy_directory(src_path, dest_path, conn, sftp,chunk_size, direction):
     # Copy file from local to remote via ssh 
     if is_local_to_remote(direction):
         await conn.run(f"mkdir -p {dest_path}", check=True)
-        for item in os.listdir(src_path):
-            local_item = os.path.join(src_path, item)
-            remote_item = os.path.join(dest_path, item)
+        for entry in os.listdir(src_path):
+            if entry in ['.', '..']:
+                continue
+            src_item = os.path.join(src_path, entry)
+            dest_item = os.path.join(dest_path, entry)
 
-            if os.path.isfile(local_item):
-                await transfer_file(local_item, remote_item, conn, sftp, chunk_size, direction)
-            elif os.path.isdir(local_item):
-                await copy_directory(local_item, remote_item, conn, sftp, chunk_size, direction)
+            if os.path.isfile(src_item):
+                await transfer_file(src_item, dest_item, conn, sftp, chunk_size, direction)
+            elif os.path.isdir(src_item):
+                await copy_directory(src_item, dest_item, conn, sftp, chunk_size, direction)
+    # Copy file from remote to local via ssh 
     else:
         os.makedirs(dest_path, exist_ok=True)
-        async for entry in await sftp.listdir(src_path):
-            remote_item = os.path.join(src_path, entry.filename)
-            local_item = os.path.join(dest_path, entry.filename)
-
-            if entry.longname.startswith("-"):  # It's a file
-                await transfer_file(remote_item, local_item, conn, sftp, chunk_size, direction)
-            elif entry.longname.startswith("d"):  # It's a directory
-                await copy_directory(remote_item, local_item, conn, sftp, chunk_size, direction) 
+        entries = await sftp.listdir(src_path)
+        for entry in entries:
+            if entry in ['.', '..']:
+                continue
+            src_item = os.path.join(src_path, entry)
+            dest_item = os.path.join(dest_path, entry)
+            reomte_is_file = await sftp.isfile(src_item)
+            remote_is_dir = await sftp.isdir(src_item)
+            if reomte_is_file:  # It's a file
+                await transfer_file(src_item, dest_item, conn, sftp, chunk_size, direction)
+            elif remote_is_dir:  # It's a directory
+                await copy_directory(src_item, dest_item, conn, sftp, chunk_size, direction) 
         
 
 async def async_scp(src_path, dest_path, host, port, username, password, chunk_size, direction):
