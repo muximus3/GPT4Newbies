@@ -160,7 +160,7 @@ def test_tokenizer(
 
 def main(
     dataset_paths= list[str],
-    base_model: str = "/data/zhangchong/llm_models/llama-7b-hf",
+    base_model: str = "/data/zhangchong/llm_models/llama-7b",
     prompt_template_file_name: str = "./templates/alpaca_short.json",
     cut_off_len: int = 100,
     train_on_inputs: bool = False,

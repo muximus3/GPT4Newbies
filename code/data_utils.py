@@ -3,7 +3,9 @@ import os
 import sys
 import numpy as np
 import pandas as pd
+import json
 import logging
+import tqdm
 sys.path.append(os.path.normpath(f'{os.path.dirname(os.path.abspath(__file__))}/..'))
 logger = logging.getLogger(__name__)
 
@@ -62,3 +64,25 @@ def get_left_data(total_msgs : list[dict], processed_msgs: list[dict]):
     print(f'processed msg: {len(processed_msgs_idx)}')
     print(f'left msg: {len(left_msgs)}')
     return left_msgs
+
+def load_jsonl(data_path: str, obj_item: bool=True):
+    if obj_item: 
+        data = []
+        for i, l in tqdm.tqdm(enumerate(open(data_path, "r"))):
+            try:
+                data.append(json.loads(l.rstrip(','))) 
+            except json.decoder.JSONDecodeError as e:
+                print(f'load line {i} error')
+                continue
+        return data
+    return [l for l in open(data_path, "r")] 
+
+def save_json(data: dict, data_path: str):
+    assert isinstance(data, (dict, list))
+    with open(data_path, "w", encoding='utf8') as openfile:
+        json.dump(data, openfile, indent=2)
+
+def load_json(data_path: str):
+    assert os.path.isfile(data_path)
+    with open(data_path, "r", encoding='utf8') as openfile:
+        return json.load(openfile)

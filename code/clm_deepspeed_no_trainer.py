@@ -185,23 +185,26 @@ def train(accelerator, config: TrainArgs):
     # decay to min_lr instead of 0
     lr_ratio = config.min_lr / config.lr
     dataset_size = len(train_dataloader) * config.micro_batch_size
-    total_batch_size = (
+    total_batch_size_per_step = (
         config.micro_batch_size
         * accelerator.num_processes
         * gradient_accumulation_steps
     )
-    steps_per_epoch = math.ceil(dataset_size / (config.micro_batch_size * accelerator.num_processes))
+    steps_per_epoch = math.ceil(len(train_dataloader) / accelerator.num_processes)
     total_num_steps = steps_per_epoch * config.num_epochs
-    # instead of decaying to zero, decay to ratio of min_lr / lr
-    total_num_steps += int(total_num_steps * lr_ratio) + config.warmup_steps
     # train_batch_size equal to micro_batch_per_gpu * gradient_acc_step * world_size
+    total_update_steps = math.ceil(total_num_steps / gradient_accumulation_steps) 
+    config.warmup_steps = config.warmup_steps * gradient_accumulation_steps
+    # instead of decaying to zero, decay to ratio of min_lr / lr
+    total_update_steps += int(total_update_steps * lr_ratio) + config.warmup_steps
+    
     accelerator.print(f"Accelerate state:\n\n{AcceleratorState()}\n")
     accelerator.print(f"Train dataset size: {dataset_size}")
     accelerator.print(
-        f"Steps per epoch: {steps_per_epoch}\nTrain epochs:{config.num_epochs}\nTotal training steps: {total_num_steps}"
+        f"Total batch size: {total_batch_size_per_step}\nGradient_acc_steps:{gradient_accumulation_steps}\nWarmup steps:{config.warmup_steps}"
     )
     accelerator.print(
-        f"Total batch size: {total_batch_size}\nGradient_acc_steps:{gradient_accumulation_steps}"
+        f"Steps per epoch: {steps_per_epoch}\nTrain epochs:{config.num_epochs}\nTotal training steps: {total_num_steps}\nTotal update steps:{total_update_steps}"
     )
 
     # Using Accelerate Deepspeed PLugin
@@ -212,28 +215,28 @@ def train(accelerator, config: TrainArgs):
         accelerator.print("linear schedule")
         scheduler = get_linear_schedule_with_warmup(
             optimizer=optimizer,
-            num_warmup_steps=config.warmup_steps * accelerator.num_processes,
-            num_training_steps=total_num_steps,
+            num_warmup_steps=config.warmup_steps,
+            num_training_steps=total_update_steps,
         )
         # scheduler = get_scheduler(
         #     name=config.lr_scheduler_type,
         #     optimizer=optimizer,
-        #     num_warmup_steps=config.warmup_steps * accelerator.num_processes,
-        #     num_training_steps=total_num_steps,
+        #     num_warmup_steps=config.warmup_steps,
+        #     num_training_steps=total_update_steps,
         # )
         # accelerator.print("cosine schedule")
         # scheduler = get_cosine_schedule_with_warmup(
         #     optimizer=optimizer,
-        #     num_warmup_steps=config.warmup_steps * accelerator.num_processes,
-        #     num_training_steps=total_num_steps,
+        #     num_warmup_steps=config.warmup_steps,
+        #     num_training_steps=total_update_steps,
         # )
     else:
         # Using deepspeed with config file
         accelerator.print("dummy schedule")
         scheduler = DummyScheduler(
             optimizer,
-            total_num_steps=config.warmup_steps,
             warmup_num_steps=config.warmup_steps,
+            total_num_steps=total_update_steps
         )
 
     model, optimizer, train_dataloader, val_dataloader, scheduler = accelerator.prepare(
@@ -290,6 +293,11 @@ def train(accelerator, config: TrainArgs):
                 accelerator.print(
                     f"Epoch:{epoch}, step:{step}, loss:{train_loss.compute()}"
                 )
+                if config.wandb:
+                    curr_step = step + epoch * len(train_dataloader)
+                    accelerator.log(
+                        {"train_loss": train_loss.compute()}, step=curr_step
+                    )
             # if step > 0 and step % config.save_every == 0:
             #     curr_step = step + epoch * len(train_dataloader)
             #     accelerator.save_state(f"{config.output_dir}/step_{curr_step}")
