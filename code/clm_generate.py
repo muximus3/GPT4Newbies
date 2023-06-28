@@ -18,7 +18,7 @@ assert (
 ), "LLaMA is now in HuggingFace's main branch.\nPlease reinstall it: pip uninstall transformers && pip install git+https://github.com/huggingface/transformers.git"
 sys.path.append(os.path.normpath(
     f"{os.path.dirname(os.path.abspath(__file__))}/.."))
-from prompter import Prompter
+from prompter import AlpacaPrompter
 from data_utils import  get_left_data, df_reader
 from tokenizer_utils import prebuild_tokenizer
 logger = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ def main(
     # deepspeed state dict file 
     if not lora and os.path.isfile(state_dict_path):
         model.load_state_dict(torch.load(state_dict_path))
-    prompter = Prompter(template_file)
+    prompter = AlpacaPrompter(template_file)
     if not load_8bit:
         # seems to fix bugs for some users.
         model.half()

@@ -194,9 +194,10 @@ def train(accelerator, config: TrainArgs):
     total_num_steps = steps_per_epoch * config.num_epochs
     # train_batch_size equal to micro_batch_per_gpu * gradient_acc_step * world_size
     total_update_steps = math.ceil(total_num_steps / gradient_accumulation_steps) 
-    config.warmup_steps = config.warmup_steps * gradient_accumulation_steps
+    # Limit warmup steps to 15% of total num steps
+    config.warmup_steps = min(config.warmup_steps * accelerator.num_processes, total_num_steps*0.15)
     # instead of decaying to zero, decay to ratio of min_lr / lr
-    total_update_steps += int(total_update_steps * lr_ratio) + config.warmup_steps
+    total_num_steps += int(total_num_steps * lr_ratio) + config.warmup_steps / 2
     
     accelerator.print(f"Accelerate state:\n\n{AcceleratorState()}\n")
     accelerator.print(f"Train dataset size: {dataset_size}")
@@ -216,7 +217,7 @@ def train(accelerator, config: TrainArgs):
         scheduler = get_linear_schedule_with_warmup(
             optimizer=optimizer,
             num_warmup_steps=config.warmup_steps,
-            num_training_steps=total_update_steps,
+            num_training_steps=total_num_steps,
         )
         # scheduler = get_scheduler(
         #     name=config.lr_scheduler_type,
@@ -236,7 +237,7 @@ def train(accelerator, config: TrainArgs):
         scheduler = DummyScheduler(
             optimizer,
             warmup_num_steps=config.warmup_steps,
-            total_num_steps=total_update_steps
+            total_num_steps=total_num_steps
         )
 
     model, optimizer, train_dataloader, val_dataloader, scheduler = accelerator.prepare(

@@ -10,7 +10,7 @@ import json
 sys.path.append(os.path.normpath(f'{os.path.dirname(os.path.abspath(__file__))}/..'))
 logger = logging.getLogger(__name__)
 
-class Prompter(object):
+class AlpacaPrompter(object):
     __slots__ = ("template", "_verbose", "system", "desc", "default_role")
 
     def __init__(self, template_file_path: str = "", verbose: bool = False):
@@ -80,6 +80,7 @@ class Prompter(object):
         if self._verbose:
             print(res)
         return res
+
 
             
 # if __name__ == "__main__":

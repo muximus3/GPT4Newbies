@@ -36,14 +36,6 @@ from transformers.models.llama import convert_llama_weights_to_hf
 sys.path.append(os.path.normpath(f"{os.path.dirname(os.path.abspath(__file__))}/.."))
 logger = logging.getLogger(__name__)
 from tokenizer_utils import *
-from prompter import Prompter
-
-IGNORE_INDEX = -100
-DEFAULT_PAD_TOKEN = "[pad]"
-DEFAULT_EOS_TOKEN = "</s>"
-DEFAULT_BOS_TOKEN = "<s>"
-DEFAULT_UNK_TOKEN = "<unk>"
-
 
 
 def print_sample(batch_examples, tokenizer: transformers.PreTrainedTokenizer, skip_s=False):
@@ -160,7 +152,7 @@ def test_tokenizer(
 
 def main(
     dataset_paths= list[str],
-    base_model: str = "/data/zhangchong/llm_models/llama-7b",
+    base_model: str = "/data/zhangchong/llm_models/llama-7b-hf",
     prompt_template_file_name: str = "./templates/alpaca_short.json",
     cut_off_len: int = 100,
     train_on_inputs: bool = False,

@@ -11,7 +11,7 @@ from typing import List
 from transformers import LlamaForCausalLM, LlamaTokenizer
 sys.path.append(os.path.normpath(f'{os.path.dirname(os.path.abspath(__file__))}/..'))
 logger = logging.getLogger(__name__)
-from prompter import Prompter
+from prompter import AlpacaPrompter
 from tokenizer_utils import load_tokenized_dataset, prebuild_tokenizer
 assert (
     "LlamaTokenizer" in transformers._import_structure["models.llama"]

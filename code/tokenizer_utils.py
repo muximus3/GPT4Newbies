@@ -17,7 +17,7 @@ from datasets import (
 
 sys.path.append(os.path.normpath(f"{os.path.dirname(os.path.abspath(__file__))}/.."))
 logger = logging.getLogger(__name__)
-from prompter import Prompter
+from prompter import AlpacaPrompter
 
 IGNORE_INDEX = -100
 DEFAULT_PAD_TOKEN = "[pad]"
@@ -48,7 +48,7 @@ def load_tokenized_dataset(
     train_on_inputs: bool = False,
     select_samples: None | list = None,
 ):
-    prompter = Prompter(template_file)
+    prompter = AlpacaPrompter(template_file)
 
     def tokenize(prompt):
         result = tokenizer(
@@ -239,3 +239,77 @@ def load_dataset_from_paths(
     return raw_datasets
 
 
+
+def load_tokenized_conversation_dataset(    
+    tokenizer: transformers.PreTrainedTokenizer,
+    dataset_paths: list[str],
+    val_set_size: int,
+    template_file: str,
+    cutoff_len: int = 512,
+    train_on_inputs: bool = False,
+    select_samples: None | list = None,
+):
+    def generate_and_tokenize_prompt(example):
+        conversations = example["conversations"]
+        tokenizer_ids = []
+        labels = []
+        attention_mask = []
+        token_num = 0
+        for turn in conversations:
+            speaker = turn["from"]
+            content = turn["value"]
+            plain_turn = f"\n\n{speaker}:\n{content}"
+            input_ids = tokenizer.encode(plain_turn, padding="max_length", truncation=True, add_special_tokens=False, max_length=cutoff_len)
+            labels = input_ids.clone()
+
+            tokenizer_ids.append(input_ids)
+            token_num += len(input_ids)
+
+
+
+
+            
+        
+
+
+def load_conversation_dataset_from_paths(
+    dataset_paths: list[str],
+) -> DatasetDict | Dataset | IterableDatasetDict | IterableDataset:
+    raw_datasets_list = []
+    for i_data, dataset_path in enumerate(dataset_paths):
+        # get file extentions
+        extention = dataset_path.split(".")[-1]
+        extention = "json" if extention == "jsonl" else extention
+        # verify data file
+        assert extention in [
+            "csv",
+            "json",
+            "jsonl",
+            "parquet",
+        ], f"File type error: {dataset_path}"
+        assert os.path.isfile(dataset_path), f"File: {dataset_path} not exists."
+        # read data
+        raw_dataset = load_dataset(extention, data_files=dataset_path, split="train")
+        logger.info(
+            f"\n\nLoad dataset: {i_data+1}/{len(dataset_paths)}\nFrom path: {dataset_path}\nColumn names:{raw_dataset.column_names}\n"
+        )
+        # standard format
+        if len({"conversations"} - set(raw_dataset.column_names)) == 0:
+            pass
+        else:
+            raise KeyError(
+                f"Data format error: {dataset_path}, columns: {raw_dataset.column_names}"
+            )
+        raw_datasets_list.append(raw_dataset)
+
+    if len(raw_datasets_list) == 1:
+        raw_datasets = raw_datasets_list[0]
+    else:
+        raw_datasets = concatenate_datasets(raw_datasets_list)
+    assert len({"conversations"} - set(raw_datasets.column_names)) == 0, raw_datasets.column_names
+    raw_datasets = raw_datasets.filter(
+        lambda example: len(example["conversations"])> 0,
+        num_proc=min(mp.cpu_count() - 1, 16),
+        desc="Remove empty instruction and output",
+    )
+    return raw_datasets

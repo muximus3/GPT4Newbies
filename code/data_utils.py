@@ -33,9 +33,9 @@ def df_saver(df: pd.DataFrame, data_path):
     extention = data_path.split('.')[-1]
     match extention:
         case 'jsonl':
-            df.to_json(df, orient='records', force_ascii=False, lines=True)
+            df.to_json(data_path, orient='records', force_ascii=False, lines=True)
         case 'json':
-            df.to_json(df, orient='records', force_ascii=False)
+            df.to_json(data_path, orient='records', force_ascii=False)
         case 'xlsx':
             df2xlsx(df, data_path, index=False)
         case 'csv' | 'tsv':

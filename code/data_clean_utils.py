@@ -23,6 +23,7 @@ import itertools
 import faiss
 import math
 import pandas as pd
+from collections import Counter
 sys.path.append(os.path.normpath(f"{os.path.dirname(os.path.abspath(__file__))}/.."))
 logger = logging.getLogger(__name__)
 from data_utils import df_reader, load_jsonl, save_json, load_json, df_saver
@@ -163,6 +164,7 @@ def async_text2vec_zh(texts, model_name_or_path, batch_size, max_length, gpus):
     embeddings = []
     for result in results:
         embeddings.extend(result)
+    torch.cuda.empty_cache()
     return np.asarray(embeddings)
 
 
@@ -193,13 +195,14 @@ def drop_dup(
     gpus=[0, 1, 2, 3],
     topk=300,
     threshold=0.9,
-    batch_size=500,
+    batch_size=350,
     max_length=256,
     verbose=False,
 ):
     pretty_print = lambda x: '\n'.join(x) if isinstance(x, list) else x
     logger.info(f"load data from:\n{pretty_print(data_paths)}")
-    def read_add_data_set_name( data_path):
+    def read_add_data_set_name(data_path):
+        assert os.path.isfile(data_path), f"{data_path} is not a file"
         data_frame = df_reader(data_path).fillna('')
         if "dataset_name" not in data_frame.columns:
             data_frame["dataset_name"] = os.path.basename(data_path)
@@ -214,8 +217,8 @@ def drop_dup(
     ids = data["rerange_id"].values
     id_vs_text = dict(zip(ids, texts))
     logger.info(f"\n{pretty_print([str(idx) + ' ' + text for idx, text in random.sample(id_vs_text.items(), 10)])}")
-    text2vec_func = async_text2vec_zh if "chinese" in model_name_or_path else async_text2vec
-    embeddings = text2vec_func(
+    # text2vec_func = async_text2vec_zh if "chinese" in model_name_or_path else async_text2vec
+    embeddings = async_text2vec(
         texts,
         model_name_or_path=model_name_or_path,
         batch_size=batch_size,
@@ -227,7 +230,7 @@ def drop_dup(
         embeddings.shape[-1], embeddings, embeddings, topk, metrics="cosine"
     )
     keep_info = {}
-    drop_info = {}
+    drop_or_not = {}
     for i_sample, i_topk_index in enumerate(tqdm(closest_topk_index)):
         # 已经是排过序
         i_topk_cosine_sim = topk_cosine_sim[i_sample]
@@ -254,12 +257,14 @@ def drop_dup(
         for sim_id in i_topk_sim_ids:
             if keep_info.get(sim_id, None) is None:
                 keep_info[sim_id] = i_topk_sim_ids[0]
-                drop_info[sim_id] = sim_id != i_topk_sim_ids[0]
+                drop_or_not[sim_id] = sim_id != i_topk_sim_ids[0]
 
     logger.info(f"origin data len: {len(data)}")
-    logger.info(f"drop len:{len([k for k, v in drop_info.items() if v])}")
+    logger.info(f"drop len:{len([k for k, v in drop_or_not.items() if v])}")
     data["center_id"] = data["rerange_id"].map(lambda x: keep_info.get(x, x))
-    data['dropped'] = data['rerange_id'].map(lambda x: drop_info.get(x, False))
+    data['dropped'] = data['rerange_id'].map(lambda x: drop_or_not.get(x, False))
+    clusters_num_count = Counter(list(keep_info.values()))
+    data['cluster_counts'] = data['center_id'].map(lambda x: clusters_num_count.get(x, 1))
     if output_path:
         df_saver(data, output_path)
         logger.info(f"save suc to {output_path}")
@@ -269,3 +274,4 @@ def drop_dup(
 if __name__ == "__main__":
     multiprocessing.set_start_method("spawn")
     fire.Fire(drop_dup)
+
