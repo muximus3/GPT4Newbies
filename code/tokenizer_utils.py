@@ -39,7 +39,7 @@ def prebuild_tokenizer(tokenizer, model=None):
         model.resize_token_embeddings(new_tokenizer_len)
 
 
-def load_tokenized_dataset(
+def load_tokenized_dataset_alpaca(
     tokenizer: transformers.PreTrainedTokenizer,
     dataset_paths: list[str],
     val_set_size: int,
@@ -64,10 +64,10 @@ def load_tokenized_dataset(
         ):
             result["input_ids"].append(tokenizer.eos_token_id)
             result["attention_mask"].append(1)
-
-        if len(result["input_ids"]) >= cutoff_len:
-            result["input_ids"][cutoff_len - 1] = tokenizer.eos_token_id
-            result["attention_mask"][cutoff_len - 1] = 1
+        # Maybe we should not learn eos token when it's not the real end of the sequence
+        # if len(result["input_ids"]) >= cutoff_len:
+        #     result["input_ids"][cutoff_len - 1] = tokenizer.eos_token_id
+        #     result["attention_mask"][cutoff_len - 1] = 1
 
         result["labels"] = result["input_ids"].copy()
 
@@ -238,37 +238,118 @@ def load_dataset_from_paths(
     )
     return raw_datasets
 
+class ConversationPrompter:
+    HUMAN_PROMPT = '\n\nHuman:\n'
+    AI_PROMPT = '\n\nAssistant:\n'
+    HUMAN = ['human', 'user']
+    # {'human': 4438666, 'gpt': 413497, 'bing': 128, 'chatgpt': 427, 'bard': 8, 'assistant': 4024539}
+    AI = ['ai', 'assistant', 'bing', 'gpt', 'gpt-4', 'gpt-3.5', 'bard', 'chatgpt']
+    def __init__(self, tokenizer):
+        self.tokenizer = tokenizer
+        self.human_prompt_len = len(tokenizer.encode(self.HUMAN_PROMPT, add_special_tokens=False))
+        self.ai_prompt_len = len(tokenizer.encode(self.AI_PROMPT, add_special_tokens=False))
+        return 
+    
+    def from_human(self, speaker: str):
+        return speaker.lower() in  self.HUMAN
+
+    def from_ai(self, speaker: str):
+        return speaker.lower() in  self.AI
+    
+    def tokenize_human(self, content, add_special_tokens, train_on_inputs=False):
+        inputs_ids = self.tokenizer.encode(self.HUMAN_PROMPT + content, add_special_tokens=add_special_tokens)
+        if not train_on_inputs:
+            labels = [-100] * len(inputs_ids)
+        else:
+            labels = inputs_ids.copy()
+        return {"input_ids": inputs_ids, "labels": labels}
+    
+    def tokenize_ai(self, content, add_special_tokens, train_on_inputs=False):
+        inputs_ids = self.tokenizer.encode(self.AI_PROMPT + content, add_special_tokens=add_special_tokens)
+        labels = inputs_ids.copy()
+        if not train_on_inputs:
+            labels[:self.ai_prompt_len] = [-100] * self.ai_prompt_len
+        return {"input_ids": inputs_ids, "labels": labels}
+
+    def tokenize_one_turn(self, speaker, content, add_special_tokens=False, train_on_inputs=False):
+        if self.from_human(speaker):
+            return self.tokenize_human(content, add_special_tokens=add_special_tokens, train_on_inputs=train_on_inputs)
+        else:
+            return self.tokenize_ai(content, add_special_tokens=add_special_tokens, train_on_inputs=train_on_inputs)
+   
+
 
 
 def load_tokenized_conversation_dataset(    
     tokenizer: transformers.PreTrainedTokenizer,
     dataset_paths: list[str],
     val_set_size: int,
-    template_file: str,
     cutoff_len: int = 512,
     train_on_inputs: bool = False,
     select_samples: None | list = None,
 ):
-    def generate_and_tokenize_prompt(example):
+    prompter = ConversationPrompter(tokenizer)
+    def generate_and_tokenize_prompt_mask_input(example):
         conversations = example["conversations"]
-        tokenizer_ids = []
+        inputs_ids = [] 
         labels = []
         attention_mask = []
-        token_num = 0
-        for turn in conversations:
+        for num_turn, turn in enumerate(conversations):
             speaker = turn["from"]
             content = turn["value"]
-            plain_turn = f"\n\n{speaker}:\n{content}"
-            input_ids = tokenizer.encode(plain_turn, padding="max_length", truncation=True, add_special_tokens=False, max_length=cutoff_len)
-            labels = input_ids.clone()
+            inputs = prompter.tokenize_one_turn(speaker, content, add_special_tokens=num_turn==0, train_on_inputs=train_on_inputs)
+            inputs_ids.extend(inputs["input_ids"])
+            labels.extend(inputs["labels"])
+            if len(inputs_ids) >= cutoff_len:
+                inputs_ids = inputs_ids[:cutoff_len]
+                labels = labels[:cutoff_len]
+                break
+        # Add eos token only when the last token is the end of the sentence.
+        if inputs_ids[-1] != tokenizer.eos_token_id and len(inputs_ids) < cutoff_len:
+            inputs_ids.append(tokenizer.eos_token_id)
+            labels.append(tokenizer.eos_token_id)
 
-            tokenizer_ids.append(input_ids)
-            token_num += len(input_ids)
+        attention_mask = [1] * len(inputs_ids)
+        return {"input_ids": inputs_ids, "labels": labels, "attention_mask": attention_mask}
 
 
+    data = load_conversation_dataset_from_paths(dataset_paths)
+    if len(data) == 0:
+        raise AssertionError(f'Empty dataset with sample number 0. Please check the dataset paths: {dataset_paths}')
 
+    if val_set_size > 0:
+        train_val = data.train_test_split(test_size=val_set_size, shuffle=True, seed=42)
+        train_data = (
+            train_val["train"]
+            .shuffle()
+            .map(
+                generate_and_tokenize_prompt_mask_input,
+                num_proc=min(mp.cpu_count() - 1, 16),
+                remove_columns=data.column_names,
+            )
+        )
+        val_data = (
+            train_val["test"]
+            .shuffle()
+            .map(generate_and_tokenize_prompt_mask_input, remove_columns=data.column_names)
+        )
+    else:
+        # for testing
+        if select_samples is not None and len(select_samples) > 0:
+            train_data = data.select(select_samples).map(
+                generate_and_tokenize_prompt_mask_input, remove_columns=data.column_names
+            )
+        else:
+            train_data = data.shuffle().map(
+                generate_and_tokenize_prompt_mask_input,
+                num_proc=min(mp.cpu_count() - 1, 16),
+                remove_columns=data.column_names,
+            )
+        val_data = None
 
-            
+    return train_data, val_data
+        
+
         
 
 
@@ -308,8 +389,12 @@ def load_conversation_dataset_from_paths(
         raw_datasets = concatenate_datasets(raw_datasets_list)
     assert len({"conversations"} - set(raw_datasets.column_names)) == 0, raw_datasets.column_names
     raw_datasets = raw_datasets.filter(
-        lambda example: len(example["conversations"])> 0,
+        lambda example: len(example["conversations"])> 1 and example["conversations"][0]["from"].lower() in ["human", "user"] ,
         num_proc=min(mp.cpu_count() - 1, 16),
-        desc="Remove empty instruction and output",
+        desc="Remove empty conversations",
     )
     return raw_datasets
+
+
+
+

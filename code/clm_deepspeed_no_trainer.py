@@ -33,7 +33,7 @@ import wandb
 
 sys.path.append(os.path.normpath(f"{os.path.dirname(os.path.abspath(__file__))}/.."))
 logger = logging.getLogger(__name__)
-from tokenizer_utils import prebuild_tokenizer, load_tokenized_dataset
+from tokenizer_utils import prebuild_tokenizer, load_tokenized_dataset_alpaca, load_tokenized_conversation_dataset
 
 torch.backends.cuda.matmul.allow_tf32 = True
 
@@ -119,14 +119,21 @@ def train(accelerator, config: TrainArgs):
 
     prebuild_tokenizer(tokenizer, model)
     with accelerator.main_process_first():
-        train_dataset, val_dataset = load_tokenized_dataset(
-            tokenizer,
-            config.dataset_paths,
-            config.max_eval_num,
-            config.prompt_template_path,
-            config.max_length,
-            config.train_on_inputs,
-        )
+        # train_dataset, val_dataset = load_tokenized_dataset_alpaca(
+        #     tokenizer,
+        #     config.dataset_paths,
+        #     config.max_eval_num,
+        #     config.prompt_template_path,
+        #     config.max_length,
+        #     config.train_on_inputs,
+        # )
+        train_dataset, val_dataset = load_tokenized_conversation_dataset(
+        tokenizer,
+        config.dataset_paths,
+        val_set_size=config.max_eval_num,
+        cutoff_len=config.max_length,
+        train_on_inputs=config.train_on_inputs,
+    )
 
     data_collator = DataCollatorForSeq2Seq(
         tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True
@@ -216,8 +223,8 @@ def train(accelerator, config: TrainArgs):
         accelerator.print("linear schedule")
         scheduler = get_linear_schedule_with_warmup(
             optimizer=optimizer,
-            num_warmup_steps=config.warmup_steps,
-            num_training_steps=total_num_steps,
+            num_warmup_steps=config.warmup_steps * 2,
+            num_training_steps=total_num_steps * 2,
         )
         # scheduler = get_scheduler(
         #     name=config.lr_scheduler_type,

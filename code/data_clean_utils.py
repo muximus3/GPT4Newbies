@@ -217,8 +217,8 @@ def drop_dup(
     ids = data["rerange_id"].values
     id_vs_text = dict(zip(ids, texts))
     logger.info(f"\n{pretty_print([str(idx) + ' ' + text for idx, text in random.sample(id_vs_text.items(), 10)])}")
-    # text2vec_func = async_text2vec_zh if "chinese" in model_name_or_path else async_text2vec
-    embeddings = async_text2vec(
+    text2vec_func = async_text2vec_zh if "chinese" in model_name_or_path else async_text2vec
+    embeddings = text2vec_func(
         texts,
         model_name_or_path=model_name_or_path,
         batch_size=batch_size,

@@ -12,7 +12,7 @@ from transformers import LlamaForCausalLM, LlamaTokenizer
 sys.path.append(os.path.normpath(f'{os.path.dirname(os.path.abspath(__file__))}/..'))
 logger = logging.getLogger(__name__)
 from prompter import AlpacaPrompter
-from tokenizer_utils import load_tokenized_dataset, prebuild_tokenizer
+from tokenizer_utils import load_tokenized_dataset_alpaca, prebuild_tokenizer
 assert (
     "LlamaTokenizer" in transformers._import_structure["models.llama"]
 ), "LLaMA is now in HuggingFace's main branch.\nPlease reinstall it: pip uninstall transformers && pip install git+https://github.com/huggingface/transformers.git"
@@ -121,7 +121,7 @@ def train(
     )
     tokenizer = LlamaTokenizer.from_pretrained(base_model)
     prebuild_tokenizer(tokenizer=tokenizer, model=model) 
-    train_data, val_data = load_tokenized_dataset(tokenizer=tokenizer, 
+    train_data, val_data = load_tokenized_dataset_alpaca(tokenizer=tokenizer, 
                                                       dataset_paths=data_paths, 
                                                       val_set_size=val_set_size, 
                                                       template_file=prompt_template_file_name,

@@ -60,7 +60,6 @@ def print_sample(batch_examples, tokenizer: transformers.PreTrainedTokenizer, sk
         masked_zero = torch.masked_select(mask, mask == 0)
         label_no_mask = torch.masked_select(label, label != -100)
         label_masked = torch.masked_select(label, label == -100)
-        input_ids_no_pad_without_label = input_ids_no_pad[: len(input_ids_no_pad) - len(label_no_mask)]
         input_ids_masked_by_label = torch.masked_select(input_ids, label == -100)
         input_ids_no_masked_by_label = torch.masked_select(input_ids, label != -100)
 
@@ -69,7 +68,6 @@ def print_sample(batch_examples, tokenizer: transformers.PreTrainedTokenizer, sk
             "input_ids_no_pad": (input_ids_no_pad, len(input_ids_no_pad)),
             "input_ids_no_mask": (input_ids_no_mask, len(input_ids_no_mask)),
             "input_ids_masked": (input_ids_masked, len(input_ids_masked)),
-            "input_ids_no_pad_without_label (expect prompts)": (input_ids_no_pad_without_label, len(input_ids_no_pad_without_label)),
             "input_ids_masked_by_label (expect prompts + pad)": (input_ids_masked_by_label, len(input_ids_masked_by_label)),
             "input_ids_no_masked_by_label (expect label)": (input_ids_no_masked_by_label, len(input_ids_no_masked_by_label)),
             "label": (label, len(label)),
@@ -90,7 +88,6 @@ def print_sample(batch_examples, tokenizer: transformers.PreTrainedTokenizer, sk
             "input_text_no_pad (expect full text without pad)": tokenizer.decode(input_ids_no_pad, skip_special_tokens=skip_s),
             "input_text_no_mask (expect full text without attention_mask)": tokenizer.decode(input_ids_no_mask, skip_special_tokens=skip_s),
             "input_text_masked (expect masked tokens with attention_mask)": tokenizer.decode(input_ids_masked, skip_special_tokens=skip_s),
-            "input_text_no_pad_without_label (expect prompts)": tokenizer.decode(input_ids_no_pad_without_label, skip_special_tokens=skip_s),
             "input_text_masked_by_label (expect prompts + pad)": tokenizer.decode(input_ids_masked_by_label, skip_special_tokens=skip_s),
             "label_no_mask (expect label)": tokenizer.decode(label_no_mask, skip_special_tokens=skip_s),
             "input_ids_no_masked_by_label (expect label)": tokenizer.decode(input_ids_no_masked_by_label, skip_special_tokens=skip_s),
@@ -129,13 +126,22 @@ def test_tokenizer(
     old_len = len(tokenizer)
     # tokenizer.pad_token_id = tokenizer.unk_token_id
     prebuild_tokenizer(tokenizer)
-    train_data, val_data = load_tokenized_dataset(tokenizer=tokenizer, 
-                                                      dataset_paths=dataset_paths, 
-                                                      val_set_size=0, 
-                                                      template_file=prompt_template_file_name,
-                                                      cutoff_len=cutoff_len,
-                                                      train_on_inputs=train_on_inputs, 
-                                                      select_samples=sample_ids)
+    # train_data, val_data = load_tokenized_dataset_alpaca(tokenizer=tokenizer, 
+    #                                                   dataset_paths=dataset_paths, 
+    #                                                   val_set_size=0, 
+    #                                                   template_file=prompt_template_file_name,
+    #                                                   cutoff_len=cutoff_len,
+    #                                                   train_on_inputs=train_on_inputs, 
+    #                                                   select_samples=sample_ids)
+
+    train_data, val_data = load_tokenized_conversation_dataset(
+        tokenizer,
+        dataset_paths,
+        val_set_size=0,
+        cutoff_len=cutoff_len,
+        train_on_inputs=train_on_inputs,
+        select_samples=sample_ids
+    )
 
     new_len = len(tokenizer)
     data_collator = transformers.DataCollatorForSeq2Seq(
@@ -156,13 +162,12 @@ def main(
     prompt_template_file_name: str = "./templates/alpaca_short.json",
     cut_off_len: int = 100,
     train_on_inputs: bool = False,
-    sample_ids: list = [10,20]
+    sample_ids: list = [1230, 2394, 2332, 99, 32]
     
 ):
     assert base_model, (
         "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
     )
-    # tokenizer = AutoTokenizer.from_pretrained(base_model)
     tokenizer = LlamaTokenizer.from_pretrained(base_model)
 
     kargs = {
