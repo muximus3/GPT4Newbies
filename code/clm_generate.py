@@ -38,7 +38,7 @@ except:
 def main(
     test_data_path: str = None,
     load_8bit: bool = False,
-    model_name_or_path: str = "/data/zhangchong/llm_models/llama-7b-hf",
+    model_name_or_path: str = "",
     tokenizer_name_or_path: str = "",
     state_dict_path: str = "",
     lora_weights: str = "",

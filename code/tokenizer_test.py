@@ -125,7 +125,7 @@ def test_tokenizer(
 ):
     old_len = len(tokenizer)
     # tokenizer.pad_token_id = tokenizer.unk_token_id
-    prebuild_tokenizer(tokenizer)
+    # prebuild_tokenizer(tokenizer)
     # train_data, val_data = load_tokenized_dataset_alpaca(tokenizer=tokenizer, 
     #                                                   dataset_paths=dataset_paths, 
     #                                                   val_set_size=0, 
