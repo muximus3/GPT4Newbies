@@ -58,16 +58,14 @@ def load_tokenized_dataset_alpaca(
             padding=False,
             return_tensors=None,
         )
-        if (
-            result["input_ids"][-1] != tokenizer.eos_token_id
-            and len(result["input_ids"]) < cutoff_len
-        ):
-            result["input_ids"].append(tokenizer.eos_token_id)
-            result["attention_mask"].append(1)
-        # Maybe we should not learn eos token when it's not the real end of the sequence
-        # if len(result["input_ids"]) >= cutoff_len:
-        #     result["input_ids"][cutoff_len - 1] = tokenizer.eos_token_id
-        #     result["attention_mask"][cutoff_len - 1] = 1
+        if result["input_ids"][-1] != tokenizer.eos_token_id:
+            if len(result["input_ids"]) < cutoff_len:
+                result["input_ids"].append(tokenizer.eos_token_id)
+                result["attention_mask"].append(1)
+            # Maybe we should not learn eos token when it's not the real end of the sequence
+            else :
+                result["input_ids"][-1] = tokenizer.eos_token_id
+                result["attention_mask"][-1] = 1
 
         result["labels"] = result["input_ids"].copy()
 
@@ -244,11 +242,11 @@ class ConversationPrompter:
     HUMAN = ['human', 'user']
     # {'human': 4438666, 'gpt': 413497, 'bing': 128, 'chatgpt': 427, 'bard': 8, 'assistant': 4024539}
     AI = ['ai', 'assistant', 'bing', 'gpt', 'gpt-4', 'gpt-3.5', 'bard', 'chatgpt']
-    def __init__(self, tokenizer):
+    def __init__(self, tokenizer, train_on_inputs=False):
         self.tokenizer = tokenizer
+        self.train_on_inputs = train_on_inputs
         self.human_prompt_len = len(tokenizer.encode(self.HUMAN_PROMPT, add_special_tokens=False))
         self.ai_prompt_len = len(tokenizer.encode(self.AI_PROMPT, add_special_tokens=False))
-        return 
     
     def from_human(self, speaker: str):
         return speaker.lower() in  self.HUMAN
@@ -256,26 +254,29 @@ class ConversationPrompter:
     def from_ai(self, speaker: str):
         return speaker.lower() in  self.AI
     
-    def tokenize_human(self, content, add_special_tokens, train_on_inputs=False):
+    def tokenize_human(self, content, add_special_tokens):
         inputs_ids = self.tokenizer.encode(self.HUMAN_PROMPT + content, add_special_tokens=add_special_tokens)
-        if not train_on_inputs:
+        if not self.train_on_inputs:
             labels = [-100] * len(inputs_ids)
         else:
             labels = inputs_ids.copy()
         return {"input_ids": inputs_ids, "labels": labels}
     
-    def tokenize_ai(self, content, add_special_tokens, train_on_inputs=False):
+    def tokenize_ai(self, content, add_special_tokens):
         inputs_ids = self.tokenizer.encode(self.AI_PROMPT + content, add_special_tokens=add_special_tokens)
         labels = inputs_ids.copy()
-        if not train_on_inputs:
+        if not self.train_on_inputs:
+            # add eos token
+            inputs_ids.append(self.tokenizer.eos_token_id)
+            labels.append(self.tokenizer.eos_token_id)
             labels[:self.ai_prompt_len] = [-100] * self.ai_prompt_len
         return {"input_ids": inputs_ids, "labels": labels}
 
-    def tokenize_one_turn(self, speaker, content, add_special_tokens=False, train_on_inputs=False):
+    def tokenize_one_turn(self, speaker, content, add_special_tokens=False):
         if self.from_human(speaker):
-            return self.tokenize_human(content, add_special_tokens=add_special_tokens, train_on_inputs=train_on_inputs)
+            return self.tokenize_human(content, add_special_tokens=add_special_tokens)
         else:
-            return self.tokenize_ai(content, add_special_tokens=add_special_tokens, train_on_inputs=train_on_inputs)
+            return self.tokenize_ai(content, add_special_tokens=add_special_tokens)
    
 
 
@@ -287,8 +288,9 @@ def load_tokenized_conversation_dataset(
     cutoff_len: int = 512,
     train_on_inputs: bool = False,
     select_samples: None | list = None,
+    complete_alpha: float = 0.9,
 ):
-    prompter = ConversationPrompter(tokenizer)
+    prompter = ConversationPrompter(tokenizer, train_on_inputs=train_on_inputs)
     def generate_and_tokenize_prompt_mask_input(example):
         conversations = example["conversations"]
         inputs_ids = [] 
@@ -297,17 +299,21 @@ def load_tokenized_conversation_dataset(
         for num_turn, turn in enumerate(conversations):
             speaker = turn["from"]
             content = turn["value"]
-            inputs = prompter.tokenize_one_turn(speaker, content, add_special_tokens=num_turn==0, train_on_inputs=train_on_inputs)
+            inputs = prompter.tokenize_one_turn(speaker, content, add_special_tokens=num_turn==0)
+            # If left space is not enough for the complete_alpha percent of current input, we drop it.
+            # Either the last turn is q/a, it is not a problem.
+            if (cutoff_len - len(inputs_ids) < complete_alpha * len(inputs["input_ids"])) and not train_on_inputs:
+                break
             inputs_ids.extend(inputs["input_ids"])
             labels.extend(inputs["labels"])
             if len(inputs_ids) >= cutoff_len:
                 inputs_ids = inputs_ids[:cutoff_len]
                 labels = labels[:cutoff_len]
                 break
-        # Add eos token only when the last token is the end of the sentence.
-        if inputs_ids[-1] != tokenizer.eos_token_id and len(inputs_ids) < cutoff_len:
-            inputs_ids.append(tokenizer.eos_token_id)
-            labels.append(tokenizer.eos_token_id)
+        if len(inputs_ids) > 0 and inputs_ids[-1] != tokenizer.eos_token_id and train_on_inputs:
+            if len(inputs_ids) < cutoff_len:
+                inputs_ids.append(tokenizer.eos_token_id)
+                labels.append(tokenizer.eos_token_id)
 
         attention_mask = [1] * len(inputs_ids)
         return {"input_ids": inputs_ids, "labels": labels, "attention_mask": attention_mask}
@@ -327,24 +333,27 @@ def load_tokenized_conversation_dataset(
                 num_proc=min(mp.cpu_count() - 1, 16),
                 remove_columns=data.column_names,
             )
+            .filter(lambda x: len(x["input_ids"]) > 0, num_proc=min(mp.cpu_count() - 1, 16))
         )
         val_data = (
             train_val["test"]
             .shuffle()
             .map(generate_and_tokenize_prompt_mask_input, remove_columns=data.column_names)
+            .filter(lambda x: len(x["input_ids"]) > 0)
         )
     else:
         # for testing
         if select_samples is not None and len(select_samples) > 0:
             train_data = data.select(select_samples).map(
                 generate_and_tokenize_prompt_mask_input, remove_columns=data.column_names
-            )
+            ).filter(lambda x: len(x["input_ids"]) > 0)
         else:
             train_data = data.shuffle().map(
                 generate_and_tokenize_prompt_mask_input,
                 num_proc=min(mp.cpu_count() - 1, 16),
                 remove_columns=data.column_names,
-            )
+            ).filter(lambda x: len(x["input_ids"]) > 0)
+            
         val_data = None
 
     return train_data, val_data

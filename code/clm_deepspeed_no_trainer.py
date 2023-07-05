@@ -33,7 +33,11 @@ import wandb
 
 sys.path.append(os.path.normpath(f"{os.path.dirname(os.path.abspath(__file__))}/.."))
 logger = logging.getLogger(__name__)
-from tokenizer_utils import prebuild_tokenizer, load_tokenized_dataset_alpaca, load_tokenized_conversation_dataset
+from tokenizer_utils import (
+    prebuild_tokenizer,
+    load_tokenized_dataset_alpaca,
+    load_tokenized_conversation_dataset,
+)
 
 torch.backends.cuda.matmul.allow_tf32 = True
 
@@ -43,7 +47,6 @@ class TrainArgs(BaseModel):
     model_name: str
     tokenizer_name: str
     dataset_paths: List[str]
-    checkpoint: Union[str, None] = None
     output_dir: str
     prompt_template_path: str
     save_name: str = None
@@ -128,12 +131,12 @@ def train(accelerator, config: TrainArgs):
         #     config.train_on_inputs,
         # )
         train_dataset, val_dataset = load_tokenized_conversation_dataset(
-        tokenizer,
-        config.dataset_paths,
-        val_set_size=config.max_eval_num,
-        cutoff_len=config.max_length,
-        train_on_inputs=config.train_on_inputs,
-    )
+            tokenizer,
+            config.dataset_paths,
+            val_set_size=config.max_eval_num,
+            cutoff_len=config.max_length,
+            train_on_inputs=config.train_on_inputs,
+        )
 
     data_collator = DataCollatorForSeq2Seq(
         tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True
@@ -200,12 +203,14 @@ def train(accelerator, config: TrainArgs):
     steps_per_epoch = math.ceil(len(train_dataloader) / accelerator.num_processes)
     total_num_steps = steps_per_epoch * config.num_epochs
     # train_batch_size equal to micro_batch_per_gpu * gradient_acc_step * world_size
-    total_update_steps = math.ceil(total_num_steps / gradient_accumulation_steps) 
+    total_update_steps = math.ceil(total_num_steps / gradient_accumulation_steps)
     # Limit warmup steps to 15% of total num steps
-    config.warmup_steps = min(config.warmup_steps * accelerator.num_processes, total_num_steps*0.15)
+    config.warmup_steps = min(
+        config.warmup_steps * accelerator.num_processes, total_num_steps * 0.15
+    )
     # instead of decaying to zero, decay to ratio of min_lr / lr
     total_num_steps += int(total_num_steps * lr_ratio) + config.warmup_steps / 2
-    
+
     accelerator.print(f"Accelerate state:\n\n{AcceleratorState()}\n")
     accelerator.print(f"Train dataset size: {dataset_size}")
     accelerator.print(
@@ -244,7 +249,7 @@ def train(accelerator, config: TrainArgs):
         scheduler = DummyScheduler(
             optimizer,
             warmup_num_steps=config.warmup_steps,
-            total_num_steps=total_num_steps
+            total_num_steps=total_num_steps,
         )
 
     model, optimizer, train_dataloader, val_dataloader, scheduler = accelerator.prepare(
@@ -253,15 +258,6 @@ def train(accelerator, config: TrainArgs):
 
     # setup for saving training states in case preemption
     accelerator.register_for_checkpointing(scheduler)
-
-    if config.checkpoint:
-        accelerator.load_state(config.checkpoint)
-        accelerator.print(f"Resumed from checkpoint: {config.checkpoint}")
-        path = os.path.basename(config.checkpoint)
-        training_difference = os.path.splitext(path)[0]
-        resume_step = int(training_difference.replace("step_", ""))
-        accelerator.skip_first_batches(train_dataloader, resume_step)
-        accelerator.print(f"Resuming from step {resume_step}")
 
     # log gradients
     if accelerator.is_main_process and config.wandb:
@@ -306,7 +302,15 @@ def train(accelerator, config: TrainArgs):
                     accelerator.log(
                         {"train_loss": train_loss.compute()}, step=curr_step
                     )
-            # if step > 0 and step % config.save_every == 0:
+            if epoch >= 1 and step == steps_per_epoch // 2:
+                accelerator.wait_for_everyone()
+                unwrapped_model = accelerator.unwrap_model(model)
+                unwrapped_model.save_pretrained(
+                    f"{config.output_dir}/epoch_{epoch+round(step/steps_per_epoch, 2)}",
+                    is_main_process=accelerator.is_main_process,
+                    save_function=accelerator.save,
+                    state_dict=accelerator.get_state_dict(model),
+                )
             #     curr_step = step + epoch * len(train_dataloader)
             #     accelerator.save_state(f"{config.output_dir}/step_{curr_step}")
 

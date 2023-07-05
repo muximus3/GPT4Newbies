@@ -124,8 +124,7 @@ def test_tokenizer(
     prompt_template_file_name:str
 ):
     old_len = len(tokenizer)
-    # tokenizer.pad_token_id = tokenizer.unk_token_id
-    # prebuild_tokenizer(tokenizer)
+    prebuild_tokenizer(tokenizer)
     # train_data, val_data = load_tokenized_dataset_alpaca(tokenizer=tokenizer, 
     #                                                   dataset_paths=dataset_paths, 
     #                                                   val_set_size=0, 
@@ -154,6 +153,7 @@ def test_tokenizer(
         print_sample(batch, tokenizer)
     print_special_token(tokenizer)
     print(f'old: {old_len}, new:{new_len}')
+    print(f'dataset train: {len(train_data)}')
 
 
 def main(
