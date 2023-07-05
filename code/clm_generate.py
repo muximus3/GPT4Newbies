@@ -114,7 +114,6 @@ def main(
         # seems to fix bugs for some users.
         model.half()
 
-    model.eval()
     if torch.__version__ >= "2" and sys.platform != "win32":
         model = torch.compile(model)
 
@@ -150,7 +149,8 @@ def main(
             # early_stopping=True,
             **kwargs,
         )
-        with torch.no_grad():
+        with torch.inference_mode():
+            model.eval()
             generation_output = model.generate(
                 input_ids=input_ids,
                 attention_mask=attention_mask,

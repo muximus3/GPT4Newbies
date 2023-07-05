@@ -24,10 +24,12 @@ import faiss
 import math
 import pandas as pd
 from collections import Counter
+
 sys.path.append(os.path.normpath(f"{os.path.dirname(os.path.abspath(__file__))}/.."))
 logger = logging.getLogger(__name__)
 from data_utils import df_reader, load_jsonl, save_json, load_json, df_saver
 from sentence_transformers import SentenceTransformer, LoggingHandler
+
 try:
     from text2vec import SentenceModel
 except:
@@ -112,9 +114,6 @@ def get_llama_embedding(
     return all_hidden_states
 
 
-
-
-
 def get_openai_embedding(data_path):
     data = load_jsonl(data_path)
     logger.info("load suc")
@@ -135,10 +134,9 @@ def get_openai_embedding(data_path):
     return none_empty_embeddings, none_empty_ids
 
 
-
 def text2vec_zh(texts, model_name_or_path="", batch_size=128, max_length=256, gpu=0):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
-    model = SentenceModel(model_name_or_path, device=f'cuda:{gpu}')
+    model = SentenceModel(model_name_or_path, device=f"cuda:{gpu}")
     model.max_seq_length = max_length
     sentence_embeddings = model.encode(
         texts, batch_size=batch_size, show_progress_bar=True, convert_to_numpy=True
@@ -149,16 +147,26 @@ def text2vec_zh(texts, model_name_or_path="", batch_size=128, max_length=256, gp
     torch.cuda.empty_cache()
     return sentence_embeddings
 
+
 def async_text2vec_zh(texts, model_name_or_path, batch_size, max_length, gpus):
     # 将数据拆分为与 GPU 数量相等的块
     num_gpus = len(gpus)
-    chunk_size =  math.ceil(len(texts) / num_gpus)
-    data_chunks = [texts[i:i + chunk_size] for i in range(0, len(texts), chunk_size)]
+    chunk_size = math.ceil(len(texts) / num_gpus)
+    data_chunks = [texts[i : i + chunk_size] for i in range(0, len(texts), chunk_size)]
     assert len(data_chunks) == num_gpus
     results = []
     with concurrent.futures.ProcessPoolExecutor(num_gpus) as executor:
         # 使用 map 函数将每个 GPU ID 与相应的数据块一起传递给 data_processing_function
-        results = list(executor.map(text2vec_zh, data_chunks,  itertools.repeat(model_name_or_path), itertools.repeat(batch_size), itertools.repeat(max_length), gpus))
+        results = list(
+            executor.map(
+                text2vec_zh,
+                data_chunks,
+                itertools.repeat(model_name_or_path),
+                itertools.repeat(batch_size),
+                itertools.repeat(max_length),
+                gpus,
+            )
+        )
 
     # 将处理后的向量数据汇总
     embeddings = []
@@ -172,26 +180,27 @@ def async_text2vec(texts, model_name_or_path, batch_size, max_length, gpus):
     # 将数据拆分为与 GPU 数量相等的块
     model = SentenceTransformer(model_name_or_path)
     model.max_seq_length = max_length
-    pool = model.start_multi_process_pool({f'cuda:{gpu}' for gpu in gpus})
+    pool = model.start_multi_process_pool({f"cuda:{gpu}" for gpu in gpus})
     num_gpus = len(gpus)
-    chunk_size =  math.ceil(len(texts) / num_gpus)
-    #Compute the embeddings using the multi-process pool
+    chunk_size = math.ceil(len(texts) / num_gpus)
+    # Compute the embeddings using the multi-process pool
     embeddings = model.encode_multi_process(texts, pool, batch_size, chunk_size)
     logger.info(f"Embeddings computed. Shape:{embeddings.shape}")
 
-    #Optional: Stop the proccesses in the pool
+    # Optional: Stop the proccesses in the pool
     model.stop_multi_process_pool(pool)
     del model
     gc.collect()
     torch.cuda.empty_cache()
     return embeddings
 
-    
+
 def drop_dup(
     data_paths,
     output_path,
     data_columns,
     model_name_or_path="/data/zhangchong/llm_models/text2vec-large-chinese",
+    embeddings_path="",
     gpus=[0, 1, 2, 3],
     topk=300,
     threshold=0.9,
@@ -199,14 +208,16 @@ def drop_dup(
     max_length=256,
     verbose=False,
 ):
-    pretty_print = lambda x: '\n'.join(x) if isinstance(x, list) else x
+    pretty_print = lambda x: "\n".join(x) if isinstance(x, list) else x
     logger.info(f"load data from:\n{pretty_print(data_paths)}")
+
     def read_add_data_set_name(data_path):
         assert os.path.isfile(data_path), f"{data_path} is not a file"
-        data_frame = df_reader(data_path).fillna('')
+        data_frame = df_reader(data_path).fillna("")
         if "dataset_name" not in data_frame.columns:
             data_frame["dataset_name"] = os.path.basename(data_path)
         return data_frame
+
     data = pd.concat([read_add_data_set_name(data_path) for data_path in data_paths])
     logger.info(f"load data suc, total shape: {data.shape}")
     data["rerange_id"] = range(len(data))
@@ -216,15 +227,21 @@ def drop_dup(
         id_vs_score = dict(zip(data["id"], data["score"]))
     ids = data["rerange_id"].values
     id_vs_text = dict(zip(ids, texts))
-    logger.info(f"\n{pretty_print([str(idx) + ' ' + text for idx, text in random.sample(id_vs_text.items(), 10)])}")
-    text2vec_func = async_text2vec_zh if "chinese" in model_name_or_path else async_text2vec
-    embeddings = text2vec_func(
-        texts,
-        model_name_or_path=model_name_or_path,
-        batch_size=batch_size,
-        max_length=max_length,
-        gpus=gpus
+    logger.info(
+        f"\n{pretty_print([str(idx) + ' ' + text for idx, text in random.sample(id_vs_text.items(), 10)])}"
     )
+    # text2vec_func = async_text2vec_zh if "chinese" in model_name_or_path else async_text2vec
+    if embeddings_path:
+        embeddings = np.load(embeddings_path)
+    else:
+        embeddings = async_text2vec(
+            texts,
+            model_name_or_path=model_name_or_path,
+            batch_size=batch_size,
+            max_length=max_length,
+            gpus=gpus,
+        )
+        np.save("embeddings.npy", embeddings)
     logger.info(f"get embeddings suc, shape: {embeddings.shape}")
     topk_cosine_sim, closest_topk_index = faiss_search_gpu(
         embeddings.shape[-1], embeddings, embeddings, topk, metrics="cosine"
@@ -262,16 +279,16 @@ def drop_dup(
     logger.info(f"origin data len: {len(data)}")
     logger.info(f"drop len:{len([k for k, v in drop_or_not.items() if v])}")
     data["center_id"] = data["rerange_id"].map(lambda x: keep_info.get(x, x))
-    data['dropped'] = data['rerange_id'].map(lambda x: drop_or_not.get(x, False))
+    data["dropped"] = data["rerange_id"].map(lambda x: drop_or_not.get(x, False))
     clusters_num_count = Counter(list(keep_info.values()))
-    data['cluster_counts'] = data['center_id'].map(lambda x: clusters_num_count.get(x, 1))
+    data["cluster_counts"] = data["center_id"].map(
+        lambda x: clusters_num_count.get(x, 1)
+    )
     if output_path:
         df_saver(data, output_path)
         logger.info(f"save suc to {output_path}")
 
 
-
 if __name__ == "__main__":
     multiprocessing.set_start_method("spawn")
     fire.Fire(drop_dup)
-

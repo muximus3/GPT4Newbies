@@ -13,7 +13,7 @@ def df_reader(data_path, header: int | None = 0, usecols: list[str | int] | None
     extention = data_path.split('.')[-1]
     match extention:
         case 'jsonl':
-            df_data = pd.read_json(data_path, lines=True)
+            df_data = pd.read_json(data_path, lines=True, convert_dates=False)
         case 'json':
             df_data = pd.read_json(data_path)
         case 'xlsx':
