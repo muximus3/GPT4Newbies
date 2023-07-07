@@ -67,7 +67,7 @@ class TrainArgs(BaseModel):
     save_every: int = 800
     log_grads_every: int = 400
     warmup_steps: int = 100
-    max_eval_num: int = 20
+    max_eval_num: int = 100
 
     lora: bool = False
     lora_alpha: int = 16
@@ -302,7 +302,7 @@ def train(accelerator, config: TrainArgs):
                     accelerator.log(
                         {"train_loss": train_loss.compute()}, step=curr_step
                     )
-            if epoch >= 1 and step == steps_per_epoch // 2:
+            if epoch >= 0 and step == steps_per_epoch // 2:
                 accelerator.wait_for_everyone()
                 unwrapped_model = accelerator.unwrap_model(model)
                 unwrapped_model.save_pretrained(

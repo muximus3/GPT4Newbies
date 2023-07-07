@@ -63,9 +63,9 @@ def load_tokenized_dataset_alpaca(
                 result["input_ids"].append(tokenizer.eos_token_id)
                 result["attention_mask"].append(1)
             # Maybe we should not learn eos token when it's not the real end of the sequence
-            else :
-                result["input_ids"][-1] = tokenizer.eos_token_id
-                result["attention_mask"][-1] = 1
+            # else :
+            #     result["input_ids"][-1] = tokenizer.eos_token_id
+            #     result["attention_mask"][-1] = 1
 
         result["labels"] = result["input_ids"].copy()
 
@@ -320,6 +320,7 @@ def load_tokenized_conversation_dataset(
 
 
     data = load_conversation_dataset_from_paths(dataset_paths)
+    print(len(data))
     if len(data) == 0:
         raise AssertionError(f'Empty dataset with sample number 0. Please check the dataset paths: {dataset_paths}')
 
