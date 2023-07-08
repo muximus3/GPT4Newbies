@@ -1,28 +1,34 @@
 # -*- coding: utf-8 -*-
-from transformers import LlamaForCausalLM, LlamaTokenizer, GenerationConfig
 import os
 import sys
 import numpy as np
-import torch
 import logging
-import gradio as gr
-from peft import PeftModel
+import transformers
 import time
 import json
 import fcntl
 import fire
-import transformers
+import torch
 from tqdm import tqdm
-assert (
-    "LlamaTokenizer" in transformers._import_structure["models.llama"]
-), "LLaMA is now in HuggingFace's main branch.\nPlease reinstall it: pip uninstall transformers && pip install git+https://github.com/huggingface/transformers.git"
-sys.path.append(os.path.normpath(
-    f"{os.path.dirname(os.path.abspath(__file__))}/.."))
+from transformers import LlamaForCausalLM, LlamaTokenizer, GenerationConfig
 from prompter import AlpacaPrompter
-from data_utils import  get_left_data, df_reader
 from tokenizer_utils import prebuild_tokenizer
+import gradio as gr
 logger = logging.getLogger(__name__)
+sys.path.append(os.path.normpath(f'{os.path.dirname(os.path.abspath(__file__))}/..'))
+from data_utils import  df_reader, get_left_data
+old_init = transformers.models.llama.modeling_llama.LlamaRotaryEmbedding.__init__
+def ntk_scaled_init(self, dim, max_position_embeddings=2048, base=10000, device=None):
 
+    #The method is just these three lines
+    max_position_embeddings = 16384
+    a = 8 #Alpha value
+    base = base * a ** (dim / (dim-2)) #Base change formula
+
+    old_init(self, dim, max_position_embeddings, base, device)
+
+
+transformers.models.llama.modeling_llama.LlamaRotaryEmbedding.__init__ = ntk_scaled_init
 
 if torch.cuda.is_available():
     device = "cuda"
@@ -41,9 +47,7 @@ def main(
     model_name_or_path: str = "",
     tokenizer_name_or_path: str = "",
     state_dict_path: str = "",
-    lora_weights: str = "",
     test_output_file="",
-    lora=False,
     # Allows to listen on all interfaces by providing '0.
     server_name: str = "0.0.0.0",
     share_gradio: bool = False,
@@ -52,13 +56,6 @@ def main(
     assert model_name_or_path, (
         "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
     )
-    if lora:
-        assert os.path.isdir(
-            lora_weights), ("Please specify a --lora_weights, e.g. --lora_weights='tloen/alpaca-lora-7b'")
-        print(
-            f'base model=========>: {model_name_or_path}\nlora weights==========>: {lora_weights}')
-
-
     if not tokenizer_name_or_path:
         tokenizer_name_or_path = model_name_or_path
 
@@ -73,13 +70,6 @@ def main(
             device_map="auto",
         )
         prebuild_tokenizer(tokenizer, model)
-        if lora:
-            model = PeftModel.from_pretrained(
-                model,
-                lora_weights,
-                torch_dtype=torch.float16,
-                # device_map={'': 0} # fix AttributeError: 'NoneType' object has no attribute 'device'
-            )
     elif device == "mps":
         model = LlamaForCausalLM.from_pretrained(
             model_name_or_path,
@@ -87,27 +77,13 @@ def main(
             torch_dtype=torch.float16,
         )
         prebuild_tokenizer(tokenizer, model)
-        if lora:
-            model = PeftModel.from_pretrained(
-                model,
-                lora_weights,
-                device_map={"": device},
-                torch_dtype=torch.float16,
-            )
     else:
         model = LlamaForCausalLM.from_pretrained(
             model_name_or_path, device_map={"": device}, low_cpu_mem_usage=True
         )
         prebuild_tokenizer(tokenizer, model)
-        if lora:
-            model = PeftModel.from_pretrained(
-                model,
-                lora_weights,
-                device_map={"": device},
-            )
-
     # deepspeed state dict file 
-    if not lora and os.path.isfile(state_dict_path):
+    if os.path.isfile(state_dict_path):
         model.load_state_dict(torch.load(state_dict_path))
     prompter = AlpacaPrompter(template_file)
     if not load_8bit:
@@ -164,8 +140,7 @@ def main(
         print('-'*40)
         print(f'raw_output:\n{output}')
         format_out = prompter.format_response(output, role=data_point.get("role", ""))
-        model_name = lora_weights if lora else os.path.basename(state_dict_path)
-        model_name = model_name if model_name else model_name_or_path
+        model_name = model_name if state_dict_path else model_name_or_path
         if test_output_file:
             data_point['output'] = format_out 
             data_point['model'] = model_name
@@ -202,7 +177,7 @@ def main(
             top_p=1,
             top_k=40,
             num_beams=4,
-            max_new_tokens=1024
+            max_new_tokens=2048
         ):
             data_point = {'instruction': instruction, 'input': input_str,
                           'output': '', 'target': '', 'role': role}
@@ -237,7 +212,7 @@ def main(
                 )
             ],
             title="🦙🌲 Alpaca-LoRA-XiaoDuo-v0.1",
-            description=f"基于 7B LLaMA 模型:{lora_weights}",
+            description=f"基于 7B LLaMA 模型:{model_name_or_path}",
         ).queue().launch(server_name=server_name, share=share_gradio)
 
 
