@@ -63,9 +63,9 @@ def load_tokenized_dataset_alpaca(
                 result["input_ids"].append(tokenizer.eos_token_id)
                 result["attention_mask"].append(1)
             # Maybe we should not learn eos token when it's not the real end of the sequence
-            # else :
-            #     result["input_ids"][-1] = tokenizer.eos_token_id
-            #     result["attention_mask"][-1] = 1
+            else :
+                result["input_ids"][-1] = tokenizer.eos_token_id
+                result["attention_mask"][-1] = 1
 
         result["labels"] = result["input_ids"].copy()
 
@@ -241,7 +241,7 @@ class ConversationPrompter:
     AI_PROMPT = '\n\nAssistant:\n'
     HUMAN = ['human', 'user']
     # {'human': 4438666, 'gpt': 413497, 'bing': 128, 'chatgpt': 427, 'bard': 8, 'assistant': 4024539}
-    AI = ['ai', 'assistant', 'bing', 'gpt', 'gpt-4', 'gpt-3.5', 'bard', 'chatgpt']
+    AI = ['ai', 'assistant', 'bing', 'gpt', 'gpt-4', 'gpt-3.5', 'bard', 'chatgpt', 'claude']
     def __init__(self, tokenizer, train_on_inputs=False):
         self.tokenizer = tokenizer
         self.train_on_inputs = train_on_inputs
@@ -288,7 +288,7 @@ def load_tokenized_conversation_dataset(
     cutoff_len: int = 512,
     train_on_inputs: bool = False,
     select_samples: None | list = None,
-    complete_alpha: float = 0.9,
+    complete_alpha: float = 0.6,
 ):
     prompter = ConversationPrompter(tokenizer, train_on_inputs=train_on_inputs)
     def generate_and_tokenize_prompt_mask_input(example):
@@ -310,10 +310,13 @@ def load_tokenized_conversation_dataset(
                 inputs_ids = inputs_ids[:cutoff_len]
                 labels = labels[:cutoff_len]
                 break
-        if len(inputs_ids) > 0 and inputs_ids[-1] != tokenizer.eos_token_id and train_on_inputs:
+        if len(inputs_ids) > 0 and inputs_ids[-1] != tokenizer.eos_token_id:
             if len(inputs_ids) < cutoff_len:
                 inputs_ids.append(tokenizer.eos_token_id)
                 labels.append(tokenizer.eos_token_id)
+            # else:
+            #     inputs_ids[-1] = tokenizer.eos_token_id
+            #     labels[-1] = tokenizer.eos_token_id
 
         attention_mask = [1] * len(inputs_ids)
         return {"input_ids": inputs_ids, "labels": labels, "attention_mask": attention_mask}

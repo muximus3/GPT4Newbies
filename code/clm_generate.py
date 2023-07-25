@@ -124,7 +124,7 @@ def main(
         top_p=0.82,
         top_k=10,
         num_beams=4,
-        max_new_tokens=2048,
+        max_new_tokens=512,
         **kwargs,
     ):
         prompt = prompter.user_prompt(

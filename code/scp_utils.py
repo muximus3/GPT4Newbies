@@ -37,7 +37,7 @@ async def transfer_file(
         src_size_bytes = os.path.getsize(src_path)
         try:
             dest_size_bytes = await sftp.getsize(dest_path)
-        except asyncssh.ProcessError:
+        except (asyncssh.ProcessError, asyncssh.sftp.SFTPNoSuchFile):
             dest_size_bytes = 0
     # from remote to local
     else:

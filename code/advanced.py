@@ -100,13 +100,14 @@ def main(
         top_p=0.82,
         top_k=10,
         num_beams=4,
-        max_new_tokens=2048,
+        max_new_tokens=512,
         **kwargs,
     ):
         prompt = prompter.user_prompt(
                 instruction=data_point["instruction"], input_ctx=data_point["input"], role=data_point.get("role", ""))
         # print(prompt)
         features = tokenizer(prompt, return_tensors="pt")
+        print(len(features['input_ids'][0]))
         input_ids = features['input_ids'].to("cuda")
         attention_mask = features['attention_mask'].to("cuda")
 

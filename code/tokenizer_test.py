@@ -125,22 +125,22 @@ def test_tokenizer(
 ):
     old_len = len(tokenizer)
     prebuild_tokenizer(tokenizer)
-    # train_data, val_data = load_tokenized_dataset_alpaca(tokenizer=tokenizer, 
-    #                                                   dataset_paths=dataset_paths, 
-    #                                                   val_set_size=0, 
-    #                                                   template_file=prompt_template_file_name,
-    #                                                   cutoff_len=cutoff_len,
-    #                                                   train_on_inputs=train_on_inputs, 
-    #                                                   select_samples=sample_ids)
+    train_data, val_data = load_tokenized_dataset_alpaca(tokenizer=tokenizer, 
+                                                      dataset_paths=dataset_paths, 
+                                                      val_set_size=0, 
+                                                      template_file=prompt_template_file_name,
+                                                      cutoff_len=cutoff_len,
+                                                      train_on_inputs=train_on_inputs, 
+                                                      select_samples=sample_ids)
 
-    train_data, val_data = load_tokenized_conversation_dataset(
-        tokenizer,
-        dataset_paths,
-        val_set_size=0,
-        cutoff_len=cutoff_len,
-        train_on_inputs=train_on_inputs,
-        select_samples=sample_ids
-    )
+    # train_data, val_data = load_tokenized_conversation_dataset(
+    #     tokenizer,
+    #     dataset_paths,
+    #     val_set_size=0,
+    #     cutoff_len=cutoff_len,
+    #     train_on_inputs=train_on_inputs,
+    #     select_samples=sample_ids
+    # )
 
     new_len = len(tokenizer)
     data_collator = transformers.DataCollatorForSeq2Seq(

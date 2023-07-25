@@ -114,24 +114,6 @@ def get_llama_embedding(
     return all_hidden_states
 
 
-def get_openai_embedding(data_path):
-    data = load_jsonl(data_path)
-    logger.info("load suc")
-    data = [(item["embedding"], item["id"]) for item in data]
-    none_empty_embeddings = []
-    none_empty_ids = []
-    logger.info(len(data))
-    for embedding, idx in data:
-        if len(embedding) == 1536:
-            none_empty_embeddings.append(embedding)
-            none_empty_ids.append(idx)
-    logger.info(len(none_empty_embeddings), len(none_empty_ids))
-    none_empty_embeddings = np.array(
-        [np.array(embedding, dtype=np.float32) for embedding in none_empty_embeddings]
-    )
-    del data
-    gc.collect()
-    return none_empty_embeddings, none_empty_ids
 
 
 def text2vec_zh(texts, model_name_or_path="", batch_size=128, max_length=256, gpu=0):
