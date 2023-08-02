@@ -125,22 +125,22 @@ def test_tokenizer(
 ):
     old_len = len(tokenizer)
     prebuild_tokenizer(tokenizer)
-    train_data, val_data = load_tokenized_dataset_alpaca(tokenizer=tokenizer, 
-                                                      dataset_paths=dataset_paths, 
-                                                      val_set_size=0, 
-                                                      template_file=prompt_template_file_name,
-                                                      cutoff_len=cutoff_len,
-                                                      train_on_inputs=train_on_inputs, 
-                                                      select_samples=sample_ids)
+    # train_data, val_data = load_tokenized_dataset_alpaca(tokenizer=tokenizer, 
+    #                                                   dataset_paths=dataset_paths, 
+    #                                                   val_set_size=0, 
+    #                                                   template_file=prompt_template_file_name,
+    #                                                   cutoff_len=cutoff_len,
+    #                                                   train_on_inputs=train_on_inputs, 
+    #                                                   select_samples=sample_ids)
 
-    # train_data, val_data = load_tokenized_conversation_dataset(
-    #     tokenizer,
-    #     dataset_paths,
-    #     val_set_size=0,
-    #     cutoff_len=cutoff_len,
-    #     train_on_inputs=train_on_inputs,
-    #     select_samples=sample_ids
-    # )
+    train_data, val_data = load_tokenized_conversation_dataset(
+        tokenizer,
+        dataset_paths,
+        val_set_size=0,
+        cutoff_len=cutoff_len,
+        train_on_inputs=train_on_inputs,
+        select_samples=sample_ids
+    )
 
     new_len = len(tokenizer)
     data_collator = transformers.DataCollatorForSeq2Seq(
@@ -169,6 +169,8 @@ def main(
         "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
     )
     tokenizer = LlamaTokenizer.from_pretrained(base_model)
+    print_special_token(tokenizer)
+    exit()
 
     kargs = {
         "dataset_paths": dataset_paths, 
@@ -183,7 +185,8 @@ def main(
 
 
 if __name__ == "__main__":
-    fire.Fire(main)
-
-
+    # fire.Fire(main)
+    from deepspeed.ops.op_builder import builder
+    version, _ =  builder.installed_cuda_version()
+    print(builder.assert_no_cuda_mismatch(str(version)))
 
