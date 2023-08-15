@@ -237,39 +237,54 @@ def load_dataset_from_paths(
     return raw_datasets
 
 class ConversationPrompter:
+    SYSTEM_PROMPT = 'System:\n'
     HUMAN_PROMPT = '\n\nHuman:\n'
     AI_PROMPT = '\n\nAssistant:\n'
+    SYSTEM_PROMPT_ZH = '系统:\n'
+    HUMAN_PROMPT_ZH = '\n\n人类:\n'
+    AI_PROMPT_ZH = '\n\nAI助手:\n'
     HUMAN = ['human', 'user']
     # {'human': 4438666, 'gpt': 413497, 'bing': 128, 'chatgpt': 427, 'bard': 8, 'assistant': 4024539}
     AI = ['ai', 'assistant', 'bing', 'gpt', 'gpt-4', 'gpt-3.5', 'bard', 'chatgpt', 'claude']
     def __init__(self, tokenizer, train_on_inputs=False):
         self.tokenizer = tokenizer
         self.train_on_inputs = train_on_inputs
-        self.human_prompt_len = len(tokenizer.encode(self.HUMAN_PROMPT, add_special_tokens=False))
-        self.ai_prompt_len = len(tokenizer.encode(self.AI_PROMPT, add_special_tokens=False))
     
     def from_human(self, speaker: str):
-        return speaker.lower() in  self.HUMAN
+        return speaker.lower() in self.HUMAN
 
-    def from_ai(self, speaker: str):
-        return speaker.lower() in  self.AI
-    
-    def tokenize_human(self, content, add_special_tokens):
-        inputs_ids = self.tokenizer.encode(self.HUMAN_PROMPT + content, add_special_tokens=add_special_tokens)
+    # def from_ai(self, speaker: str):
+    #     return speaker.lower() in  self.AI
+
+    def tokenize_system(self, content, add_special_tokens=True):
+        inputs_ids = self.tokenizer.encode(self.SYSTEM_PROMPT + content, add_special_tokens=add_special_tokens)
         if not self.train_on_inputs:
             labels = [-100] * len(inputs_ids)
         else:
             labels = inputs_ids.copy()
         return {"input_ids": inputs_ids, "labels": labels}
     
-    def tokenize_ai(self, content, add_special_tokens):
-        inputs_ids = self.tokenizer.encode(self.AI_PROMPT + content, add_special_tokens=add_special_tokens)
+    def tokenize_human(self, content, add_special_tokens):
+        human_prompt = self.HUMAN_PROMPT if not add_special_tokens else self.HUMAN_PROMPT.lstrip()       
+        prompt = human_prompt + content 
+        inputs_ids = self.tokenizer.encode(prompt, add_special_tokens=add_special_tokens)
+        if not self.train_on_inputs:
+            labels = [-100] * len(inputs_ids)
+        else:
+            labels = inputs_ids.copy()
+        return {"input_ids": inputs_ids, "labels": labels}
+    
+    def tokenize_ai(self, content, add_special_tokens=False):
+        ai_prompt = self.AI_PROMPT if not add_special_tokens else self.AI_PROMPT.lstrip()
+        ai_prompt_len = len(self.tokenizer.encode(ai_prompt, add_special_tokens=False)) 
+        prompt = ai_prompt + content
+        inputs_ids = self.tokenizer.encode(prompt, add_special_tokens=add_special_tokens)
         labels = inputs_ids.copy()
         if not self.train_on_inputs:
             # add eos token
             inputs_ids.append(self.tokenizer.eos_token_id)
             labels.append(self.tokenizer.eos_token_id)
-            labels[:self.ai_prompt_len] = [-100] * self.ai_prompt_len
+            labels[:ai_prompt_len] = [-100] * ai_prompt_len
         return {"input_ids": inputs_ids, "labels": labels}
 
     def tokenize_one_turn(self, speaker, content, add_special_tokens=False):
@@ -296,27 +311,32 @@ def load_tokenized_conversation_dataset(
         inputs_ids = [] 
         labels = []
         attention_mask = []
+
+        if example.get("system_prompt", ''):
+            inputs = prompter.tokenize_system(example["system_prompt"])
+            inputs_ids.extend(inputs["input_ids"])
+            labels.extend(inputs["labels"]) 
+
         for num_turn, turn in enumerate(conversations):
             speaker = turn["from"]
             content = turn["value"]
-            inputs = prompter.tokenize_one_turn(speaker, content, add_special_tokens=num_turn==0)
-            # If left space is not enough for the complete_alpha percent of current input, we drop it.
-            # Either the last turn is q/a, it is not a problem.
-            if (cutoff_len - len(inputs_ids) < complete_alpha * len(inputs["input_ids"])) and not train_on_inputs:
-                break
+            inputs = prompter.tokenize_one_turn(speaker, content, add_special_tokens=len(inputs_ids)==0)
             inputs_ids.extend(inputs["input_ids"])
             labels.extend(inputs["labels"])
-            if len(inputs_ids) >= cutoff_len:
+            # If left space is not enough for the complete_alpha percent of current input, we drop it.
+            # Either the last turn is q/a, it is not a problem.
+            if len(inputs_ids) + complete_alpha * len(inputs["input_ids"]) > cutoff_len:
                 inputs_ids = inputs_ids[:cutoff_len]
                 labels = labels[:cutoff_len]
+                if len(inputs_ids) > 0 and inputs_ids[-1] != tokenizer.eos_token_id:
+                    if len(inputs_ids) < cutoff_len:
+                        inputs_ids.append(tokenizer.eos_token_id)
+                        # learn eos token only from response
+                        labels.append(tokenizer.eos_token_id if not prompter.from_human(speaker) else -100)
+                    else:
+                        inputs_ids[-1] = tokenizer.eos_token_id
+                        labels[-1] = tokenizer.eos_token_id if not prompter.from_human(speaker) else -100
                 break
-        if len(inputs_ids) > 0 and inputs_ids[-1] != tokenizer.eos_token_id:
-            if len(inputs_ids) < cutoff_len:
-                inputs_ids.append(tokenizer.eos_token_id)
-                labels.append(tokenizer.eos_token_id)
-            # else:
-            #     inputs_ids[-1] = tokenizer.eos_token_id
-            #     labels[-1] = tokenizer.eos_token_id
 
         attention_mask = [1] * len(inputs_ids)
         return {"input_ids": inputs_ids, "labels": labels, "attention_mask": attention_mask}

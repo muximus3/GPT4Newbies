@@ -139,7 +139,7 @@ def train(accelerator, config: TrainArgs):
         )
 
     data_collator = DataCollatorForSeq2Seq(
-        tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True
+        tokenizer, pad_to_multiple_of=4, return_tensors="pt", padding=True
     )
     train_dataloader = DataLoader(
         train_dataset,

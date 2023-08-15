@@ -58,8 +58,8 @@ def print_sample(batch_examples, tokenizer: transformers.PreTrainedTokenizer, sk
         input_ids_masked = torch.masked_select(input_ids, mask == 0)
         masked_one = torch.masked_select(mask, mask == 1)
         masked_zero = torch.masked_select(mask, mask == 0)
-        label_no_mask = torch.masked_select(label, label != -100)
         label_masked = torch.masked_select(label, label == -100)
+        label_no_mask = torch.masked_select(label, label != -100)
         input_ids_masked_by_label = torch.masked_select(input_ids, label == -100)
         input_ids_no_masked_by_label = torch.masked_select(input_ids, label != -100)
 
@@ -84,12 +84,12 @@ def print_sample(batch_examples, tokenizer: transformers.PreTrainedTokenizer, sk
 
         print("Decoded Texts:")
         decoded_texts = {
-            "input_text (expect full text with pad)": tokenizer.decode(input_ids, skip_special_tokens=skip_s),
-            "input_text_no_pad (expect full text without pad)": tokenizer.decode(input_ids_no_pad, skip_special_tokens=skip_s),
-            "input_text_no_mask (expect full text without attention_mask)": tokenizer.decode(input_ids_no_mask, skip_special_tokens=skip_s),
+            "input_ids (expect full text with pad)": tokenizer.decode(input_ids, skip_special_tokens=skip_s),
+            "input_ids_no_pad (expect full text without pad)": tokenizer.decode(input_ids_no_pad, skip_special_tokens=skip_s),
+            "input_ids_no_mask (expect full text without attention_mask)": tokenizer.decode(input_ids_no_mask, skip_special_tokens=skip_s),
             "input_text_masked (expect masked tokens with attention_mask)": tokenizer.decode(input_ids_masked, skip_special_tokens=skip_s),
-            "input_text_masked_by_label (expect prompts + pad)": tokenizer.decode(input_ids_masked_by_label, skip_special_tokens=skip_s),
             "label_no_mask (expect label)": tokenizer.decode(label_no_mask, skip_special_tokens=skip_s),
+            "input_ids_masked_by_label (expect masked ids)": tokenizer.decode(input_ids_masked_by_label, skip_special_tokens=skip_s),
             "input_ids_no_masked_by_label (expect label)": tokenizer.decode(input_ids_no_masked_by_label, skip_special_tokens=skip_s),
         }
 
@@ -144,7 +144,7 @@ def test_tokenizer(
 
     new_len = len(tokenizer)
     data_collator = transformers.DataCollatorForSeq2Seq(
-            tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True
+            tokenizer, pad_to_multiple_of=4, return_tensors="pt", padding=True
         )
     data_loader = DataLoader(train_data, collate_fn=data_collator, batch_size=2)
     data_loader_iter = iter(data_loader)
@@ -162,15 +162,13 @@ def main(
     prompt_template_file_name: str = "./templates/alpaca_short.json",
     cut_off_len: int = 100,
     train_on_inputs: bool = False,
-    sample_ids: list = [1230, 2394, 2332, 99, 32]
+    sample_ids: list = [1230, 2394, 2332, 9, 32]
     
 ):
     assert base_model, (
         "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
     )
     tokenizer = LlamaTokenizer.from_pretrained(base_model)
-    print_special_token(tokenizer)
-    exit()
 
     kargs = {
         "dataset_paths": dataset_paths, 
@@ -185,8 +183,5 @@ def main(
 
 
 if __name__ == "__main__":
-    # fire.Fire(main)
-    from deepspeed.ops.op_builder import builder
-    version, _ =  builder.installed_cuda_version()
-    print(builder.assert_no_cuda_mismatch(str(version)))
+    fire.Fire(main)
 
