@@ -204,7 +204,7 @@ def drop_dup(
     logger.info(f"load data suc, total shape: {data.shape}")
     data["rerange_id"] = range(len(data))
     # in case of origin index is not continuous
-    if 'instruction' in data_columns:
+    if 'conversations' not in data_columns:
         texts = data[data_columns].astype(str).agg("".join, axis=1).values.tolist()
     else:
         texts = data['conversations'].map(lambda x: ' '.join([i['value'] for i in x if i['from'].lower() in ['human', 'user']])).astype(str).values.tolist()

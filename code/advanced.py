@@ -12,7 +12,7 @@ import torch
 from tqdm import tqdm
 from transformers import LlamaForCausalLM, LlamaTokenizer, GenerationConfig
 from prompter import AlpacaPrompter
-from tokenizer_utils import prebuild_tokenizer
+from code.tokenizer_conversations import prebuild_tokenizer
 import gradio as gr
 logger = logging.getLogger(__name__)
 sys.path.append(os.path.normpath(f'{os.path.dirname(os.path.abspath(__file__))}/..'))

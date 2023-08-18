@@ -1,12 +1,4 @@
 # -*- coding: utf-8 -*-
-# @Time    : 2023/03/24 17:37
-# @Author  : zhangchong
-# @Site    : 
-# @File    : clm_lora_peft_llama_generate.py
-# @Software: Code
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 import os
 import sys
 import numpy as np
@@ -28,14 +20,16 @@ import json
 from copy import deepcopy
 import copy
 from torch.utils.data import DataLoader
+import datasets
 assert (
     "LlamaTokenizer" in transformers._import_structure["models.llama"]
 ), "LLaMA is now in HuggingFace's main branch.\nPlease reinstall it: pip uninstall transformers && pip install git+https://github.com/huggingface/transformers.git"
+from transformers import DataCollatorForLanguageModeling
 from transformers import LlamaForCausalLM, LlamaTokenizer, GenerationConfig, BloomTokenizerFast, AutoTokenizer
 from transformers.models.llama import convert_llama_weights_to_hf
 sys.path.append(os.path.normpath(f"{os.path.dirname(os.path.abspath(__file__))}/.."))
 logger = logging.getLogger(__name__)
-from tokenizer_utils import *
+from tokenizer_conversations import *
 
 
 def print_sample(batch_examples, tokenizer: transformers.PreTrainedTokenizer, skip_s=False):
@@ -50,7 +44,6 @@ def print_sample(batch_examples, tokenizer: transformers.PreTrainedTokenizer, sk
         tokenizer (transformers.PreTrainedTokenizer): _description_
         skip_s (bool, optional): _description_. Defaults to False.
     """
-    print(batch_examples.keys())
     for i, (input_ids, label, mask) in enumerate(zip(batch_examples["input_ids"], batch_examples["labels"], batch_examples["attention_mask"])):
         # attention mask pad ，label mask input and pad
         input_ids_no_pad = torch.masked_select(input_ids, input_ids != tokenizer.pad_token_id)
@@ -62,6 +55,7 @@ def print_sample(batch_examples, tokenizer: transformers.PreTrainedTokenizer, sk
         label_no_mask = torch.masked_select(label, label != -100)
         input_ids_masked_by_label = torch.masked_select(input_ids, label == -100)
         input_ids_no_masked_by_label = torch.masked_select(input_ids, label != -100)
+
 
         print_info = {
             "input_ids": (input_ids, len(input_ids)),
@@ -162,7 +156,7 @@ def main(
     prompt_template_file_name: str = "./templates/alpaca_short.json",
     cut_off_len: int = 100,
     train_on_inputs: bool = False,
-    sample_ids: list = [1230, 2394, 2332, 9, 32]
+    sample_ids: list = [1230, 2394, 2332, 9]
     
 ):
     assert base_model, (
@@ -184,4 +178,7 @@ def main(
 
 if __name__ == "__main__":
     fire.Fire(main)
+
+
+
 

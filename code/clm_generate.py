@@ -20,7 +20,7 @@ sys.path.append(os.path.normpath(
     f"{os.path.dirname(os.path.abspath(__file__))}/.."))
 from prompter import AlpacaPrompter
 from data_utils import  get_left_data, df_reader
-from tokenizer_utils import prebuild_tokenizer
+from code.tokenizer_conversations import prebuild_tokenizer
 logger = logging.getLogger(__name__)
 
 
