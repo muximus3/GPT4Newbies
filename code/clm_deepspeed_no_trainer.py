@@ -33,7 +33,7 @@ import wandb
 
 sys.path.append(os.path.normpath(f"{os.path.dirname(os.path.abspath(__file__))}/.."))
 logger = logging.getLogger(__name__)
-from code.tokenizer_conversations import (
+from tokenizer_conversations import (
     prebuild_tokenizer,
     load_tokenized_conversation_dataset,
 )
