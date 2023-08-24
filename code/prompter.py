@@ -17,7 +17,6 @@ class AlpacaPrompter(object):
         """Strongly relay on a template with format like: 
         {
         "description": "Template used by Alpaca-LoRA.",
-        "system": "",
         "prompt_input": "Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.\n\n### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n{role}:\n",
         "prompt_no_input": "Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n### Instruction:\n{instruction}\n\n{role}:\n",
         "response_split": "{role}:",    
@@ -35,18 +34,18 @@ class AlpacaPrompter(object):
             raise ValueError(f"Can't read {template_file_path}")
         with open(template_file_path) as fp:
             self.template = json.load(fp)
-            self.system = self.template['system']
             self.desc = self.template['description']
             self.default_role = self.template['default_role']
         if self._verbose:
             logger.info(
-                f"Using prompt template {template_file_path}: {self.template['description']}, role:{self.template['']}"
+                f"Using prompt template {template_file_path}: {self.desc}, role:{self.default_role}"
             )
     def user_prompt(
         self,
         instruction: str,
         input_ctx: str="",
         role: str="",
+        system: str="",
     ):
         # returns the user prompt from instruction and optional input
         template_prompt = self.template["prompt_input"] if input_ctx else self.template["prompt_no_input"]
@@ -60,9 +59,9 @@ class AlpacaPrompter(object):
             prompt = template_prompt.format(
                     instruction=instruction, role=role
                 )
-        header = self.system.format(role=role)
-        prompt = f"{header}{prompt}"
-
+        if system:
+            prompt = f"{self.template['system']}{system}{prompt}"
+        prompt = prompt.lstrip()  
         if self._verbose:
             logger.info(f'user prompt:{prompt}')
         return prompt
@@ -84,8 +83,10 @@ class AlpacaPrompter(object):
 
             
 # if __name__ == "__main__":
-#     p = Prompter('templates/system_role_zh.json')
-#     print(p.user_prompt('hello follow', 'a + b', role=''))
+#     p = AlpacaPrompter('./templates/conversitions.json')
+#     print(p.user_prompt('hello follow', 'a + b', role='AI', system='Now you are a bad AI'))
+#     print('-' * 20)
+#     print(p.user_prompt('hello follow', 'a + b', role='AI', system=''))
 #     print('-' * 20)
 #     print(p.user_prompt('hello follow', 'a + b', role=''))
 #     print('-' * 20)

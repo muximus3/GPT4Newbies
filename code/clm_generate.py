@@ -20,7 +20,7 @@ sys.path.append(os.path.normpath(
     f"{os.path.dirname(os.path.abspath(__file__))}/.."))
 from prompter import AlpacaPrompter
 from data_utils import  get_left_data, df_reader
-from code.tokenizer_conversations import prebuild_tokenizer
+from tokenizer_conversations import prebuild_tokenizer
 logger = logging.getLogger(__name__)
 
 
@@ -128,12 +128,11 @@ def main(
         **kwargs,
     ):
         prompt = prompter.user_prompt(
-                instruction=data_point["instruction"], input_ctx=data_point["input"], role=data_point.get("role", ""))
+                instruction=data_point["instruction"], input_ctx=data_point["input"], role=data_point.get("role", ""), system=data_point.get("system_prompt", data_point.get("system", "")))
         # print(prompt)
-        features = tokenizer(prompt, return_tensors="pt")
+        features = tokenizer(prompt, return_tensors="pt", add_special_tokens=True)
         input_ids = features['input_ids'].to("cuda")
         attention_mask = features['attention_mask'].to("cuda")
-
         generation_config = GenerationConfig(
             # temperature=temperature,
             # top_p=top_p,
