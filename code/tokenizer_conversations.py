@@ -32,7 +32,7 @@ def prebuild_tokenizer(tokenizer, model=None):
         tokenizer.pad_token_id = tokenizer.unk_token_id
     tokenizer.bos_token_id = 1
     tokenizer.eos_token_id = 2
-    tokenizer.padding_side = "right"
+    tokenizer.padding_side = "left"
     new_tokenizer_len = len(tokenizer)
     if origin_tokenizer_len != new_tokenizer_len and model:
         print(f"resize embeddings from {origin_tokenizer_len} to {new_tokenizer_len}")
@@ -129,7 +129,7 @@ def load_tokenized_conversation_dataset(
             # Either the last turn is q/a, it is not a problem.
             inputs_ids.extend(inputs["input_ids"])
             labels.extend(inputs["labels"])
-            if cutoff_len  <= len(inputs_ids):
+            if len(inputs_ids) >= cutoff_len:
                 inputs_ids = inputs_ids[:cutoff_len]
                 labels = labels[:cutoff_len]
                 if len(inputs_ids) > 0 and inputs_ids[-1] != tokenizer.eos_token_id:
@@ -141,9 +141,9 @@ def load_tokenized_conversation_dataset(
                         inputs_ids[-1] = tokenizer.eos_token_id
                         labels[-1] = tokenizer.eos_token_id if not prompter.from_human(speaker) else -100
                 break
-        # all -100
+        # all label ids are -100, we set to empty and filter later
         if labels.count(-100) == len(labels):
-            labels[-20:-10] = inputs_ids[-20:-10]
+            inputs_ids = []
         attention_mask = [1] * len(inputs_ids)
         return {"input_ids": inputs_ids, "labels": labels, "attention_mask": attention_mask}
 
