@@ -108,7 +108,6 @@ def load_tokenized_conversation_dataset(
     cutoff_len: int = 512,
     train_on_inputs: bool = False,
     select_samples: None | list = None,
-    complete_alpha: float = 0.6,
 ):
     prompter = ConversationPrompter(tokenizer, train_on_inputs=train_on_inputs)
     def generate_and_tokenize_prompt_mask_input(example):
@@ -128,7 +127,9 @@ def load_tokenized_conversation_dataset(
             inputs = prompter.tokenize_one_turn(speaker, content, add_special_tokens=len(inputs_ids)==0)
             # If left space is not enough for the complete_alpha percent of current input, we drop it.
             # Either the last turn is q/a, it is not a problem.
-            if cutoff_len - len(inputs_ids) < complete_alpha * len(inputs["input_ids"]):
+            inputs_ids.extend(inputs["input_ids"])
+            labels.extend(inputs["labels"])
+            if cutoff_len  <= len(inputs_ids):
                 inputs_ids = inputs_ids[:cutoff_len]
                 labels = labels[:cutoff_len]
                 if len(inputs_ids) > 0 and inputs_ids[-1] != tokenizer.eos_token_id:
@@ -140,12 +141,9 @@ def load_tokenized_conversation_dataset(
                         inputs_ids[-1] = tokenizer.eos_token_id
                         labels[-1] = tokenizer.eos_token_id if not prompter.from_human(speaker) else -100
                 break
-            inputs_ids.extend(inputs["input_ids"])
-            labels.extend(inputs["labels"])
         # all -100
-        if labels.count(labels[0]) == len(labels):
-            random.randrange(0, len(labels), )
-            labels[] = inputs_ids[]
+        if labels.count(-100) == len(labels):
+            labels[-20:-10] = inputs_ids[-20:-10]
         attention_mask = [1] * len(inputs_ids)
         return {"input_ids": inputs_ids, "labels": labels, "attention_mask": attention_mask}
 
