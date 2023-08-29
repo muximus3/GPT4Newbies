@@ -135,17 +135,24 @@ def test_tokenizer(
         train_on_inputs=train_on_inputs,
         select_samples=sample_ids
     )
-
+    print('finish preprocessing')
     new_len = len(tokenizer)
-    data_collator = transformers.DataCollatorForSeq2Seq(
-            tokenizer, pad_to_multiple_of=4, return_tensors="pt", padding=True
-        )
-    data_loader = DataLoader(train_data, collate_fn=data_collator, batch_size=2)
-    data_loader_iter = iter(data_loader)
-    for i in range(len(data_loader_iter)):
-        batch = next(data_loader_iter)
-        print_sample(batch, tokenizer)
-    print_special_token(tokenizer)
+    if len(train_data) < 10:
+        data_collator = transformers.DataCollatorForSeq2Seq(
+                tokenizer, pad_to_multiple_of=4, return_tensors="pt", padding=True
+            )
+        data_loader = DataLoader(train_data, collate_fn=data_collator, batch_size=2)
+        data_loader_iter = iter(data_loader)
+        for i in range(len(data_loader_iter)):
+            batch = next(data_loader_iter)
+            print_sample(batch, tokenizer)
+        print_special_token(tokenizer)
+    def get_len(example):
+        example['len'] = len(example['input_ids'])
+        return example
+    train_data = train_data.map(get_len, num_proc=mp.cpu_count() - 1)
+    inputs_ids_len = train_data['len']
+    print(f'inputs ids mean len: {np.mean(inputs_ids_len)}, max len: {max(inputs_ids_len)}, min len: {min(inputs_ids_len)}')
     print(f'old: {old_len}, new:{new_len}')
     print(f'dataset train: {len(train_data)}')
 
