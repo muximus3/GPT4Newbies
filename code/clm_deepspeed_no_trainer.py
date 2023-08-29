@@ -2,6 +2,8 @@
 import os
 import sys
 import logging
+import re
+import shutil
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -62,8 +64,8 @@ class TrainArgs(BaseModel):
     min_lr: float = 0.0
     weight_decay: float = 0.0
     eval_every: int = 200
+    max_to_keep_per_epoch: int = 1
     print_loss_every: int = 50
-    save_every: int = 800
     log_grads_every: int = 400
     warmup_steps: int = 100
     max_eval_num: int = 100
@@ -100,6 +102,29 @@ def evaluate(model, val_dataloader, accelerator):
             val_loss.update(loss_values["loss"])
 
     return val_loss
+
+def manage_checkpoint_files(output_dir, max_to_keep_per_epoch=1, epoch_num=3):
+    # Use regex to parse filename
+    pattern = re.compile(r'epoch_(\d+)_step_\d+_loss_([\d.]+)')
+
+    # Store the filenames and losses for each epoch
+    epoch_files = {i: [] for i in range(epoch_num)}
+    for filename in os.listdir(output_dir):
+        match = pattern.search(filename)
+        if match:
+            epoch = int(match.group(1))
+            loss = float(match.group(2))
+            epoch_files[epoch].append((loss, filename))
+    print(epoch_files)
+    # Keep only the file with the lowest loss for each epoch
+    for epoch, files in epoch_files.items():
+        if len(files) > max_to_keep_per_epoch:
+            # Sort the files by loss (in ascending order)
+            files.sort()
+            # Remove the files with higher loss
+            for loss, filename in files[max_to_keep_per_epoch:]:
+                print(f'remove: {filename}')
+                shutil.rmtree(os.path.join(output_dir, filename)) 
 
 
 def train(accelerator, config: TrainArgs):
@@ -209,7 +234,8 @@ def train(accelerator, config: TrainArgs):
     )
     # instead of decaying to zero, decay to ratio of min_lr / lr
     total_num_steps += int(total_num_steps * lr_ratio) + config.warmup_steps / 2
-
+    config.eval_every = min(config.eval_every, steps_per_epoch/100)
+    
     accelerator.print(f"Accelerate state:\n\n{AcceleratorState()}\n")
     accelerator.print(f"Train dataset size: {dataset_size}")
     accelerator.print(
@@ -261,10 +287,11 @@ def train(accelerator, config: TrainArgs):
     # log gradients
     if accelerator.is_main_process and config.wandb:
         wandb.watch(model, log_freq=config.log_grads_every, log="all")
-
+    val_loss_tracker = []
     for epoch in range(config.num_epochs):
         train_loss = MeanMetric(nan_strategy="error").to(model.device)
         for step, batch in enumerate(tqdm(train_dataloader)):
+            global_step = epoch * steps_per_epoch + step
             model.train()
             outputs = model(**batch)
             loss = outputs.loss
@@ -301,15 +328,7 @@ def train(accelerator, config: TrainArgs):
                     accelerator.log(
                         {"train_loss": train_loss.compute()}, step=curr_step
                     )
-            if epoch >= 0 and step == steps_per_epoch // 2:
-                accelerator.wait_for_everyone()
-                unwrapped_model = accelerator.unwrap_model(model)
-                unwrapped_model.save_pretrained(
-                    f"{config.output_dir}/epoch_{epoch+round(step/steps_per_epoch, 2)}",
-                    is_main_process=accelerator.is_main_process,
-                    save_function=accelerator.save,
-                    state_dict=accelerator.get_state_dict(model),
-                )
+
             #     curr_step = step + epoch * len(train_dataloader)
             #     accelerator.save_state(f"{config.output_dir}/step_{curr_step}")
 
@@ -320,6 +339,21 @@ def train(accelerator, config: TrainArgs):
 
                 log_train = {"train_loss": train_loss.compute()}
                 log_val = {"val_loss": val_loss.compute()}
+                # save best model
+                if global_step >= 0.98 * steps_per_epoch  and log_val["val_loss"] < min(val_loss_tracker):
+                    val_loss_tracker = []
+                    accelerator.wait_for_everyone()
+                    unwrapped_model = accelerator.unwrap_model(model)
+                    val_loss_round2 = round(log_val["val_loss"], 2)
+                    unwrapped_model.save_pretrained(
+                        f"{config.output_dir}/epoch_{epoch}_step_{step}_loss_{val_loss_round2}",
+                        is_main_process=accelerator.is_main_process,
+                        save_function=accelerator.save,
+                        state_dict=accelerator.get_state_dict(model),
+                    )
+                manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch)   
+                    
+                val_loss_tracker.append(log_val["val_loss"]) 
 
                 if config.wandb:
                     curr_step = step + epoch * len(train_dataloader)
@@ -339,7 +373,7 @@ def train(accelerator, config: TrainArgs):
         accelerator.print(f"Epoch {epoch} finished")
         accelerator.print(f"Saving checkpoint to:{config.output_dir}")
         accelerator.wait_for_everyone()
-        unwrapped_model = accelerator.unwrap_model(model)
+        # unwrapped_model = accelerator.unwrap_model(model)
         # try:
         #     if accelerator.is_main_process and config.save_name:
         #         unwrapped_model.push_to_hub(config.save_name + f"-epoch_{epoch}", private=True)
@@ -347,12 +381,6 @@ def train(accelerator, config: TrainArgs):
         #     accelerator.print(e)
         #     accelerator.print(f"Failed to push to hub")
 
-        unwrapped_model.save_pretrained(
-            f"{config.output_dir}/epoch_{epoch}",
-            is_main_process=accelerator.is_main_process,
-            save_function=accelerator.save,
-            state_dict=accelerator.get_state_dict(model),
-        )
 
     accelerator.wait_for_everyone()
     accelerator.end_training()
