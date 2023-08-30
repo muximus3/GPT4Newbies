@@ -236,7 +236,7 @@ def train(accelerator, config: TrainArgs):
     )
     # instead of decaying to zero, decay to ratio of min_lr / lr
     total_num_steps += int(total_num_steps * lr_ratio) + config.warmup_steps / 2
-    config.eval_every = min(config.eval_every, steps_per_epoch/100)
+    config.eval_every = int(min(config.eval_every, steps_per_epoch/100))
     
     accelerator.print(f"Accelerate state:\n\n{AcceleratorState()}\n")
     accelerator.print(f"Train dataset size: {dataset_size}")
@@ -244,7 +244,7 @@ def train(accelerator, config: TrainArgs):
         f"Total batch size: {total_batch_size_per_step}\nGradient_acc_steps:{gradient_accumulation_steps}\nWarmup steps:{config.warmup_steps}"
     )
     accelerator.print(
-        f"Steps per epoch: {steps_per_epoch}\nTrain epochs:{config.num_epochs}\nTotal training steps: {total_num_steps}\nTotal update steps:{total_update_steps}"
+        f"Steps per epoch: {steps_per_epoch}\nTrain epochs:{config.num_epochs}\nTotal training steps: {total_num_steps}\nTotal update steps:{total_update_steps}\nEval every:{config.eval_every}"
     )
 
     # Using Accelerate Deepspeed PLugin

@@ -115,7 +115,8 @@ def test_tokenizer(
     cutoff_len: int,
     train_on_inputs: bool,
     sample_ids:list,
-    prompt_template_file_name:str
+    prompt_template_file_name:str,
+    group_by_length: bool
 ):
     old_len = len(tokenizer)
     prebuild_tokenizer(tokenizer)
@@ -133,7 +134,8 @@ def test_tokenizer(
         val_set_size=0,
         cutoff_len=cutoff_len,
         train_on_inputs=train_on_inputs,
-        select_samples=sample_ids
+        select_samples=sample_ids,
+        group_by_length=group_by_length
     )
     print('finish preprocessing')
     new_len = len(tokenizer)
@@ -155,6 +157,7 @@ def test_tokenizer(
     print(f'inputs ids mean len: {np.mean(inputs_ids_len)}, max len: {max(inputs_ids_len)}, min len: {min(inputs_ids_len)}')
     print(f'old: {old_len}, new:{new_len}')
     print(f'dataset train: {len(train_data)}')
+    print(inputs_ids_len[:1000])
 
 
 def main(
@@ -163,21 +166,22 @@ def main(
     prompt_template_file_name: str = "./templates/alpaca_short.json",
     cut_off_len: int = 100,
     train_on_inputs: bool = False,
-    sample_ids: list = [1230, 2394, 2332, 9]
+    sample_ids: list = [1230, 2394, 2332, 9],
+    group_by_length: bool = False
     
 ):
     assert base_model, (
         "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
     )
     tokenizer = LlamaTokenizer.from_pretrained(base_model)
-
     kargs = {
         "dataset_paths": dataset_paths, 
         "tokenizer": tokenizer, 
         "cutoff_len": cut_off_len,
         "train_on_inputs": train_on_inputs, 
         "sample_ids": sample_ids,
-        "prompt_template_file_name": prompt_template_file_name
+        "prompt_template_file_name": prompt_template_file_name,
+        "group_by_length": group_by_length
         }
     print(kargs)
     test_tokenizer(**kargs)
