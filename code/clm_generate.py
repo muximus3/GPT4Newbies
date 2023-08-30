@@ -124,15 +124,15 @@ def main(
         top_p=0.82,
         top_k=10,
         num_beams=4,
-        max_new_tokens=612,
+        max_new_tokens=512,
         **kwargs,
     ):
         instruction = data_point["instruction"]
         input = data_point["input"]
         role = data_point.get("role", "")
         system = data_point.get("system_prompt", data_point.get("system", ""))
-        if system in instruction:
-            instruction = instruction.replace(system, '')
+        # if system in instruction:
+        instruction = instruction.replace(system, '').strip()
         prompt = prompter.user_prompt(instruction=instruction, input_ctx=input, role=role, system=system)
         # print(prompt)
         features = tokenizer(prompt, return_tensors="pt", add_special_tokens=False)
