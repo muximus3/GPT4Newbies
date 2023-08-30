@@ -287,8 +287,8 @@ def train(accelerator, config: TrainArgs):
     # log gradients
     if accelerator.is_main_process and config.wandb:
         wandb.watch(model, log_freq=config.log_grads_every, log="all")
-    val_loss_tracker = []
     for epoch in range(config.num_epochs):
+        val_loss_tracker = []
         train_loss = MeanMetric(nan_strategy="error").to(model.device)
         for step, batch in enumerate(tqdm(train_dataloader)):
             global_step = epoch * steps_per_epoch + step
@@ -339,9 +339,9 @@ def train(accelerator, config: TrainArgs):
 
                 log_train = {"train_loss": train_loss.compute()}
                 log_val = {"val_loss": val_loss.compute()}
+
                 # save best model
                 if global_step >= 0.98 * steps_per_epoch  and log_val["val_loss"] < min(val_loss_tracker):
-                    val_loss_tracker = []
                     accelerator.wait_for_everyone()
                     unwrapped_model = accelerator.unwrap_model(model)
                     val_loss_round2 = round(log_val["val_loss"], 2)
@@ -351,7 +351,8 @@ def train(accelerator, config: TrainArgs):
                         save_function=accelerator.save,
                         state_dict=accelerator.get_state_dict(model),
                     )
-                manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch)   
+                if step % (2 * config.eval_every) == 0:
+                    manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch)   
                     
                 val_loss_tracker.append(log_val["val_loss"]) 
 

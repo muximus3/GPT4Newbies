@@ -127,8 +127,13 @@ def main(
         max_new_tokens=612,
         **kwargs,
     ):
-        prompt = prompter.user_prompt(
-                instruction=data_point["instruction"], input_ctx=data_point["input"], role=data_point.get("role", ""), system=data_point.get("system_prompt", data_point.get("system", "")))
+        instruction = data_point["instruction"]
+        input = data_point["input"]
+        role = data_point.get("role", "")
+        system = data_point.get("system_prompt", data_point.get("system", ""))
+        if system in instruction:
+            instruction = instruction.replace(system, '')
+        prompt = prompter.user_prompt(instruction=instruction, input_ctx=input, role=role, system=system)
         # print(prompt)
         features = tokenizer(prompt, return_tensors="pt", add_special_tokens=False)
         input_ids = features['input_ids'].to("cuda")
