@@ -291,7 +291,6 @@ def train(accelerator, config: TrainArgs):
         val_loss_tracker = []
         train_loss = MeanMetric(nan_strategy="error").to(model.device)
         for step, batch in enumerate(tqdm(train_dataloader)):
-            global_step = epoch * steps_per_epoch + step
             model.train()
             outputs = model(**batch)
             loss = outputs.loss
@@ -341,10 +340,11 @@ def train(accelerator, config: TrainArgs):
                 log_val = {"val_loss": val_loss.compute()}
 
                 # save best model
-                if global_step >= 0.98 * steps_per_epoch  and log_val["val_loss"] < min(val_loss_tracker):
+                if step >= (0.98 * (1 - epoch/config.num_epoch)) * steps_per_epoch  and log_val["val_loss"] < min(val_loss_tracker):
+                    val_loss_round2 = round(log_val["val_loss"], 2)
+                    accelerator.print(f'Saving checkpoint, epoch:{epoch}, step:{step}, loss:{val_loss_round2}\n Loss trcker:{val_loss_tracker}')
                     accelerator.wait_for_everyone()
                     unwrapped_model = accelerator.unwrap_model(model)
-                    val_loss_round2 = round(log_val["val_loss"], 2)
                     unwrapped_model.save_pretrained(
                         f"{config.output_dir}/epoch_{epoch}_step_{step}_loss_{val_loss_round2}",
                         is_main_process=accelerator.is_main_process,
@@ -352,7 +352,7 @@ def train(accelerator, config: TrainArgs):
                         state_dict=accelerator.get_state_dict(model),
                     )
                 if step % (2 * config.eval_every) == 0:
-                    manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch)   
+                    manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch, config.num_epochs)   
                     
                 val_loss_tracker.append(log_val["val_loss"]) 
 
