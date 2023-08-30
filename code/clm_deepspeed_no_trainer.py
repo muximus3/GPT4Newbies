@@ -65,6 +65,7 @@ class TrainArgs(BaseModel):
     weight_decay: float = 0.0
     eval_every: int = 200
     max_to_keep_per_epoch: int = 1
+    group_by_length: bool = False
     print_loss_every: int = 50
     log_grads_every: int = 400
     warmup_steps: int = 100
@@ -160,6 +161,7 @@ def train(accelerator, config: TrainArgs):
             val_set_size=config.max_eval_num,
             cutoff_len=config.max_length,
             train_on_inputs=config.train_on_inputs,
+            group_by_length=config.group_by_length
         )
 
     data_collator = DataCollatorForSeq2Seq(

@@ -119,6 +119,7 @@ def load_tokenized_conversation_dataset(
     train_on_inputs: bool = False,
     select_samples: None | list = None,
     complete_alpha: float = 0.6,
+    group_by_length: bool = False,
 ):
     prompter = ConversationPrompter(tokenizer, train_on_inputs=train_on_inputs)
     def generate_and_tokenize_prompt_mask_input(example):
@@ -188,7 +189,6 @@ def load_tokenized_conversation_dataset(
         train_val = data.train_test_split(test_size=val_set_size, shuffle=True, seed=42)
         train_data = (
             train_val["train"]
-            .shuffle()
             .map(
                 generate_and_tokenize_prompt_mask_input,
                 num_proc=mp.cpu_count() - 2,
@@ -198,7 +198,6 @@ def load_tokenized_conversation_dataset(
         )
         val_data = (
             train_val["test"]
-            .shuffle()
             .map(generate_and_tokenize_prompt_mask_input, remove_columns=data.column_names)
             .filter(lambda x: len(x["input_ids"]) > 0)
         )
@@ -209,14 +208,19 @@ def load_tokenized_conversation_dataset(
                 generate_and_tokenize_prompt_mask_input, remove_columns=data.column_names
             ).filter(lambda x: len(x["input_ids"]) > 0, num_proc=mp.cpu_count() - 2)
         else:
-            train_data = data.shuffle().map(
+            train_data = data.map(
                 generate_and_tokenize_prompt_mask_input,
                 num_proc=mp.cpu_count() - 2,
                 remove_columns=data.column_names,
             ).filter(lambda x: len(x["input_ids"]) > 0, num_proc=mp.cpu_count() - 2)
-            
+            train_data = train_data.shuffle() if not group_by_length else train_data
         val_data = None
 
+    if group_by_length:
+        def add_len(example):
+            example['ids_len'] = len(example['input_ids'])
+            return example
+        train_data = train_data.map(add_len, num_proc=mp.cpu_count() - 2, desc='SORT BY LEN').sort('ids_len').remove_columns('ids_len')
     return train_data, val_data
         
 

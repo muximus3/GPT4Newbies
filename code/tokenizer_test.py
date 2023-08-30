@@ -147,10 +147,10 @@ def test_tokenizer(
             batch = next(data_loader_iter)
             print_sample(batch, tokenizer)
         print_special_token(tokenizer)
-    def get_len(example):
+    def add_len(example):
         example['len'] = len(example['input_ids'])
         return example
-    train_data = train_data.map(get_len, num_proc=mp.cpu_count() - 1)
+    train_data = train_data.map(add_len, num_proc=mp.cpu_count() - 1)
     inputs_ids_len = train_data['len']
     print(f'inputs ids mean len: {np.mean(inputs_ids_len)}, max len: {max(inputs_ids_len)}, min len: {min(inputs_ids_len)}')
     print(f'old: {old_len}, new:{new_len}')
