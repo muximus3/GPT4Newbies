@@ -342,7 +342,7 @@ def train(accelerator, config: TrainArgs):
                 log_val = {"val_loss": val_loss.compute()}
 
                 # save best model
-                if step >= (0.98 * (1 - epoch/config.num_epoch)) * steps_per_epoch  and log_val["val_loss"] < min(val_loss_tracker):
+                if step >= (0.98 * (1 - epoch/config.num_epochs)) * steps_per_epoch  and log_val["val_loss"] < min(val_loss_tracker):
                     val_loss_round2 = round(log_val["val_loss"], 2)
                     accelerator.print(f'Saving checkpoint, epoch:{epoch}, step:{step}, loss:{val_loss_round2}\n Loss trcker:{val_loss_tracker}')
                     accelerator.wait_for_everyone()
