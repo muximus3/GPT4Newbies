@@ -345,12 +345,14 @@ def train(accelerator, config: TrainArgs):
                     accelerator.print(f'Saving checkpoint, epoch:{epoch}, step:{step}, loss:{val_loss_round2}\n Loss trcker:{val_loss_tracker}')
                     accelerator.wait_for_everyone()
                     unwrapped_model = accelerator.unwrap_model(model)
+                    checkpoint_dir = f"{config.output_dir}/epoch_{epoch}_step_{step}_loss_{val_loss_round2}"
                     unwrapped_model.save_pretrained(
-                        f"{config.output_dir}/epoch_{epoch}_step_{step}_loss_{val_loss_round2}",
+                        checkpoint_dir,
                         is_main_process=accelerator.is_main_process,
                         save_function=accelerator.save,
                         state_dict=accelerator.get_state_dict(model),
                     )
+                    tokenizer.save_pretrained(checkpoint_dir)
                 if step % (2 * config.eval_every) == 0:
                     manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch, config.num_epochs)   
                     
