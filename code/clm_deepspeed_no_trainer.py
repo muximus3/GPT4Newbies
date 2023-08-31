@@ -237,7 +237,7 @@ def train(accelerator, config: TrainArgs):
     )
     # instead of decaying to zero, decay to ratio of min_lr / lr
     total_num_steps += int(total_num_steps * lr_ratio) + config.warmup_steps / 2
-    config.eval_every = int(min(config.eval_every, steps_per_epoch/100))
+    config.eval_every = int(min(config.eval_every, steps_per_epoch / 100))
     
     accelerator.print(f"Accelerate state:\n\n{AcceleratorState()}\n")
     accelerator.print(f"Dataloader * micro_batch_size: {dataset_size}")
@@ -337,7 +337,8 @@ def train(accelerator, config: TrainArgs):
             if step > 0 and (
                 step % config.eval_every == 0 or step == len(train_dataloader) - 1
             ):
-                accelerator.print(f'Eval Epoch: {epoch}, step:{step}, data_loader_size:{len(train_dataloader)}, steps_per_epoch:{steps_per_epoch}')
+                # assert len(train_dataloader) == steps_per_epoch
+                # accelerator.print(f'Eval Epoch: {epoch}, step:{step}, data_loader_size:{len(train_dataloader)}, steps_per_epoch:{steps_per_epoch}')
                 val_loss = evaluate(model, val_dataloader, accelerator)
 
                 log_train = {"train_loss": train_loss.compute()}
