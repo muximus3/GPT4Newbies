@@ -63,9 +63,9 @@ class TrainArgs(BaseModel):
     lr: float = 2e-5
     min_lr: float = 0.0
     weight_decay: float = 0.0
-    eval_every: int = 200
     max_to_keep_per_epoch: int = 1
     group_by_length: bool = False
+    eval_every: int = 200
     print_loss_every: int = 50
     log_grads_every: int = 400
     warmup_steps: int = 100
@@ -355,8 +355,8 @@ def train(accelerator, config: TrainArgs):
                         state_dict=accelerator.get_state_dict(model),
                     )
                     tokenizer.save_pretrained(checkpoint_dir)
-                if step % (2 * config.eval_every) == 0:
-                    manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch, config.num_epochs)   
+                    if step % (2 * config.eval_every) == 0 and os.path.isdir(config.output_dir):
+                        manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch, config.num_epochs)   
                     
                 val_loss_tracker.append(log_val["val_loss"]) 
 

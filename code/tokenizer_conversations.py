@@ -170,9 +170,10 @@ def load_tokenized_conversation_dataset(
                 labels.append(-100 if prompter.from_human(speakers[-1]) or prompter.from_system(speakers[-1]) else tokenizer.eos_token_id)
             # cutted to cutoff_len or happen to equal cutoff_len
             else:
-                inputs_ids[-1] = tokenizer.eos_token_id
-                # not the last token, we set to -100
-                labels[-1] = -100
+                pass
+            #     inputs_ids[-1] = tokenizer.eos_token_id
+            #     # not the last token, we set to -100
+            #     labels[-1] = -100
         # all label ids are -100, we set to empty and filter later
         if labels.count(-100) == len(labels):
             inputs_ids = []
