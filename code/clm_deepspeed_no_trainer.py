@@ -39,6 +39,7 @@ from tokenizer_conversations import (
     prebuild_tokenizer,
     load_tokenized_conversation_dataset,
 )
+from data_utils import find_files_unrecu
 
 torch.backends.cuda.matmul.allow_tf32 = True
 
@@ -239,9 +240,9 @@ def train(accelerator, config: TrainArgs):
     config.eval_every = int(min(config.eval_every, steps_per_epoch/100))
     
     accelerator.print(f"Accelerate state:\n\n{AcceleratorState()}\n")
-    accelerator.print(f"Train dataset size: {dataset_size}")
+    accelerator.print(f"Dataloader * micro_batch_size: {dataset_size}")
     accelerator.print(
-        f"Total batch size: {total_batch_size_per_step}\nGradient_acc_steps:{gradient_accumulation_steps}\nWarmup steps:{config.warmup_steps}"
+        f"Total batch size: {total_batch_size_per_step}\nDataloader size: {len(train_dataloader)}\nGradient_acc_steps:{gradient_accumulation_steps}\nMicro batch size:{config.micro_batch_size}\nWarmup steps:{config.warmup_steps}"
     )
     accelerator.print(
         f"Steps per epoch: {steps_per_epoch}\nTrain epochs:{config.num_epochs}\nTotal training steps: {total_num_steps}\nTotal update steps:{total_update_steps}\nEval every:{config.eval_every}"
@@ -336,25 +337,28 @@ def train(accelerator, config: TrainArgs):
             if step > 0 and (
                 step % config.eval_every == 0 or step == len(train_dataloader) - 1
             ):
+                accelerator.print(f'Eval Epoch: {epoch}, step:{step}, data_loader_size:{len(train_dataloader)}, steps_per_epoch:{steps_per_epoch}')
                 val_loss = evaluate(model, val_dataloader, accelerator)
 
                 log_train = {"train_loss": train_loss.compute()}
                 log_val = {"val_loss": val_loss.compute()}
 
                 # save best model
-                if step >= (0.98 * (1 - epoch/config.num_epochs)) * steps_per_epoch  and log_val["val_loss"] < min(val_loss_tracker):
-                    val_loss_round2 = round(log_val["val_loss"], 2)
-                    accelerator.print(f'Saving checkpoint, epoch:{epoch}, step:{step}, loss:{val_loss_round2}\n Loss trcker:{val_loss_tracker}')
-                    accelerator.wait_for_everyone()
-                    unwrapped_model = accelerator.unwrap_model(model)
-                    checkpoint_dir = f"{config.output_dir}/epoch_{epoch}_step_{step}_loss_{val_loss_round2}"
-                    unwrapped_model.save_pretrained(
-                        checkpoint_dir,
-                        is_main_process=accelerator.is_main_process,
-                        save_function=accelerator.save,
-                        state_dict=accelerator.get_state_dict(model),
-                    )
-                    tokenizer.save_pretrained(checkpoint_dir)
+                if step >= (0.98 * (1 - epoch/config.num_epochs)) * len(train_dataloader):
+                    no_cp_for_current_epoch = step >= len(train_dataloader) - 1 and len(find_files_unrecu(config.output_dir, f'epoch_{epoch}_*')) == 0
+                    if log_val["val_loss"] < min(val_loss_tracker) or no_cp_for_current_epoch:
+                        val_loss_round2 = round(log_val["val_loss"], 2)
+                        accelerator.print(f'Saving checkpoint, epoch:{epoch}, step:{step}, loss:{val_loss_round2}\n Loss trcker:{val_loss_tracker}')
+                        accelerator.wait_for_everyone()
+                        unwrapped_model = accelerator.unwrap_model(model)
+                        checkpoint_dir = f"{config.output_dir}/epoch_{epoch}_step_{step}_loss_{val_loss_round2}"
+                        unwrapped_model.save_pretrained(
+                            checkpoint_dir,
+                            is_main_process=accelerator.is_main_process,
+                            save_function=accelerator.save,
+                            state_dict=accelerator.get_state_dict(model),
+                        )
+                        tokenizer.save_pretrained(checkpoint_dir)
                     if step % (2 * config.eval_every) == 0 and os.path.isdir(config.output_dir):
                         manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch, config.num_epochs)   
                     

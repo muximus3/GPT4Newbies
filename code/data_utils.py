@@ -6,6 +6,9 @@ import pandas as pd
 import json
 import logging
 import tqdm
+from pathlib import Path
+import fnmatch
+
 sys.path.append(os.path.normpath(f'{os.path.dirname(os.path.abspath(__file__))}/..'))
 logger = logging.getLogger(__name__)
 
@@ -86,3 +89,13 @@ def load_json(data_path: str):
     assert os.path.isfile(data_path)
     with open(data_path, "r", encoding='utf8') as openfile:
         return json.load(openfile)
+
+        
+def find_files_unrecu(directory, pattern):
+    """ finds all files matching the pattern."""
+    if not Path(directory).is_dir():
+        raise AssertionError('NOT A VALID DIRECTORY!!')
+    files = []
+    for filename in fnmatch.filter(os.listdir(directory), pattern):
+        files.append(os.path.join(os.path.abspath(directory), filename))
+    return files
