@@ -349,11 +349,11 @@ def train(accelerator, config: TrainArgs):
                 if step >= (0.98 * (1 - epoch/config.num_epochs)) * len(train_dataloader):
                     no_cp_for_current_epoch = step >= len(train_dataloader) - 1 and len(find_files_unrecu(config.output_dir, f'epoch_{epoch}_*')) == 0
                     if log_val["val_loss"] < min(val_loss_tracker) or no_cp_for_current_epoch:
-                        val_loss_round2 = round(log_val["val_loss"], 2)
-                        accelerator.print(f'Saving checkpoint, epoch:{epoch}, step:{step}, loss:{val_loss_round2}\n Loss trcker:{val_loss_tracker}')
+                        val_loss_round2 = f'{log_val["val_loss"]:.2f}'
                         accelerator.wait_for_everyone()
                         unwrapped_model = accelerator.unwrap_model(model)
                         checkpoint_dir = f"{config.output_dir}/epoch_{epoch}_step_{step}_loss_{val_loss_round2}"
+                        accelerator.print(f'Saving checkpoint:{checkpoint_dir}, epoch:{epoch}, step:{step}, loss:{val_loss_round2}\n Loss trcker:{val_loss_tracker}')
                         unwrapped_model.save_pretrained(
                             checkpoint_dir,
                             is_main_process=accelerator.is_main_process,
