@@ -237,7 +237,8 @@ def train(accelerator, config: TrainArgs):
     )
     # instead of decaying to zero, decay to ratio of min_lr / lr
     total_num_steps += int(total_num_steps * lr_ratio) + config.warmup_steps / 2
-    config.eval_every = int(min(config.eval_every, steps_per_epoch / 100))
+    # eval_every 
+    config.eval_every = int(min(config.eval_every, max(steps_per_epoch / 100, 20)))
     
     accelerator.print(f"Accelerate state:\n\n{AcceleratorState()}\n")
     accelerator.print(f"Dataloader * micro_batch_size: {dataset_size}")
@@ -381,8 +382,8 @@ def train(accelerator, config: TrainArgs):
         get_accelerator().empty_cache()
 
         accelerator.print(f"Epoch {epoch} finished")
-        accelerator.print(f"Saving checkpoint to:{config.output_dir}")
-        accelerator.wait_for_everyone()
+        # accelerator.print(f"Saving checkpoint to:{config.output_dir}")
+        # accelerator.wait_for_everyone()
         # unwrapped_model = accelerator.unwrap_model(model)
         # try:
         #     if accelerator.is_main_process and config.save_name:

@@ -93,9 +93,9 @@ def load_json(data_path: str):
         
 def find_files_unrecu(directory, pattern):
     """ finds all files matching the pattern."""
-    if not Path(directory).is_dir():
-        raise AssertionError('NOT A VALID DIRECTORY!!')
     files = []
+    if not Path(directory).is_dir():
+        return files
     for filename in fnmatch.filter(os.listdir(directory), pattern):
         files.append(os.path.join(os.path.abspath(directory), filename))
     return files
