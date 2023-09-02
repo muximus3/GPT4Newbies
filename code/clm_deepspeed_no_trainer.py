@@ -105,29 +105,16 @@ def evaluate(model, val_dataloader, accelerator):
 
     return val_loss
 
-def manage_checkpoint_files(output_dir, max_to_keep_per_epoch=1, epoch_num=3):
+def manage_checkpoint_files(output_dir, epoch, max_to_keep_per_epoch=1):
     # Use regex to parse filename
-    pattern = re.compile(r'epoch_(\d+)_step_\d+_loss_([\d.]+)')
-
-    # Store the filenames and losses for each epoch
-    epoch_files = {i: [] for i in range(epoch_num)}
-    for filename in os.listdir(output_dir):
-        match = pattern.search(filename)
-        if match:
-            epoch = int(match.group(1))
-            loss = float(match.group(2))
-            epoch_files[epoch].append((loss, filename))
-    print(epoch_files)
-    # Keep only the file with the lowest loss for each epoch
-    for epoch, files in epoch_files.items():
-        if len(files) > max_to_keep_per_epoch:
-            # Sort the files by loss (in ascending order)
-            files.sort()
-            # Remove the files with higher loss
-            for loss, filename in files[max_to_keep_per_epoch:]:
-                print(f'remove: {filename}')
-                shutil.rmtree(os.path.join(output_dir, filename)) 
-
+    files = find_files_unrecu(output_dir, f'epoch_{epoch}_*')
+    files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+    if len(files) > max_to_keep_per_epoch:
+        keep_files = files[:max_to_keep_per_epoch]
+        remove_files = files[max_to_keep_per_epoch:]
+        return keep_files, remove_files
+    else:
+        return files, []
 
 def train(accelerator, config: TrainArgs):
     set_seed(config.seed)
@@ -233,10 +220,10 @@ def train(accelerator, config: TrainArgs):
     total_update_steps = math.ceil(total_num_steps / gradient_accumulation_steps)
     # Limit warmup steps to 15% of total num steps
     config.warmup_steps = min(
-        config.warmup_steps * accelerator.num_processes, total_num_steps * 0.15
+        config.warmup_steps * accelerator.num_processes, math.ceil(total_num_steps * 0.15)
     )
     # instead of decaying to zero, decay to ratio of min_lr / lr
-    total_num_steps += int(total_num_steps * lr_ratio) + config.warmup_steps / 2
+    total_num_steps += int(total_num_steps * lr_ratio) + math.ceil(config.warmup_steps / 2)
     # eval_every 
     config.eval_every = int(min(config.eval_every, max(steps_per_epoch / 100, 20)))
     
@@ -361,8 +348,19 @@ def train(accelerator, config: TrainArgs):
                             state_dict=accelerator.get_state_dict(model),
                         )
                         tokenizer.save_pretrained(checkpoint_dir)
-                    if step % (2 * config.eval_every) == 0 and os.path.isdir(config.output_dir):
-                        manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch, config.num_epochs)   
+                    if accelerator.is_main_process:
+                        if step % (2 * config.eval_every) == 0 and os.path.isdir(config.output_dir):
+                            keep_files, remove_files = manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch, epoch)   
+                            if len(remove_files) > 0:
+                                accelerator.print(f'keep epoch files: {keep_files}\nremove epoch files: {remove_files}')
+                                for remove_file in remove_files:
+                                    try:
+                                        shutil.rmtree(remove_file)
+                                    except FileNotFoundError:
+                                        accelerator.print(f'removing file failed, not found eror: {remove_file}')
+                    else:
+                        accelerator.wait_for_everyone()
+
                     
                 val_loss_tracker.append(log_val["val_loss"]) 
 
