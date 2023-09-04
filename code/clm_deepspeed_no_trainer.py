@@ -17,7 +17,7 @@ from deepspeed.runtime.zero.stage3 import estimate_zero3_model_states_mem_needs_
 import torch
 import os
 import torch
-import torch.nn as nn
+import numpy as np
 from accelerate import Accelerator
 from accelerate.utils import DummyScheduler, DummyOptim, set_seed
 from accelerate.state import AcceleratorState
@@ -281,6 +281,7 @@ def train(accelerator, config: TrainArgs):
     for epoch in range(config.num_epochs):
         val_loss_tracker = []
         train_loss = MeanMetric(nan_strategy="error").to(model.device)
+        # len(train_dataloader) == steps_per_epoch
         for step, batch in enumerate(tqdm(train_dataloader)):
             model.train()
             outputs = model(**batch)
@@ -335,12 +336,12 @@ def train(accelerator, config: TrainArgs):
                 # save best model
                 if step >= (0.98 * (1 - epoch/config.num_epochs)) * len(train_dataloader):
                     no_cp_for_current_epoch = step >= len(train_dataloader) - 1 and len(find_files_unrecu(config.output_dir, f'epoch_{epoch}_*')) == 0
-                    if log_val["val_loss"] < min(val_loss_tracker) or no_cp_for_current_epoch:
-                        val_loss_round2 = f'{log_val["val_loss"]:.2f}'
+                    val_loss_npy = log_val["val_loss"].cpu().numpy()
+                    if  val_loss_npy < min(val_loss_tracker) or no_cp_for_current_epoch:
                         accelerator.wait_for_everyone()
                         unwrapped_model = accelerator.unwrap_model(model)
-                        checkpoint_dir = f"{config.output_dir}/epoch_{epoch}_step_{step}_loss_{val_loss_round2}"
-                        accelerator.print(f'Saving checkpoint:{checkpoint_dir}, epoch:{epoch}, step:{step}, loss:{val_loss_round2}\n Loss trcker:{val_loss_tracker}')
+                        checkpoint_dir = f"{config.output_dir}/epoch_{epoch}_step_{step}_loss_{val_loss_npy}"
+                        accelerator.print(f'Saving checkpoint:{checkpoint_dir}, epoch:{epoch}, step:{step}, loss:{val_loss_npy}\n Loss trcker:{val_loss_tracker}')
                         unwrapped_model.save_pretrained(
                             checkpoint_dir,
                             is_main_process=accelerator.is_main_process,
@@ -348,21 +349,18 @@ def train(accelerator, config: TrainArgs):
                             state_dict=accelerator.get_state_dict(model),
                         )
                         tokenizer.save_pretrained(checkpoint_dir)
-                    if accelerator.is_main_process:
-                        if step % (2 * config.eval_every) == 0 and os.path.isdir(config.output_dir):
-                            keep_files, remove_files = manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch, epoch)   
-                            if len(remove_files) > 0:
-                                accelerator.print(f'keep epoch files: {keep_files}\nremove epoch files: {remove_files}')
-                                for remove_file in remove_files:
-                                    try:
-                                        shutil.rmtree(remove_file)
-                                    except FileNotFoundError:
-                                        accelerator.print(f'removing file failed, not found eror: {remove_file}')
-                    else:
-                        accelerator.wait_for_everyone()
+                    if step % (2 * config.eval_every) == 0 and os.path.isdir(config.output_dir):
+                        keep_files, remove_files = manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch, epoch)   
+                        if len(remove_files) > 0:
+                            accelerator.print(f'keep epoch files: {keep_files}\nremove epoch files: {remove_files}')
+                            for remove_file in remove_files:
+                                try:
+                                    shutil.rmtree(remove_file)
+                                except FileNotFoundError:
+                                    accelerator.print(f'removing file failed, not found eror: {remove_file}')
 
                     
-                val_loss_tracker.append(log_val["val_loss"]) 
+                val_loss_tracker.append(val_loss_npy) 
 
                 if config.wandb:
                     curr_step = step + epoch * len(train_dataloader)
