@@ -334,9 +334,9 @@ def train(accelerator, config: TrainArgs):
                 log_val = {"val_loss": val_loss.compute()}
 
                 # save best model
+                val_loss_npy = log_val["val_loss"].cpu().numpy()
                 if step >= (0.98 * (1 - epoch/config.num_epochs)) * len(train_dataloader):
                     no_cp_for_current_epoch = step >= len(train_dataloader) - 1 and len(find_files_unrecu(config.output_dir, f'epoch_{epoch}_*')) == 0
-                    val_loss_npy = log_val["val_loss"].cpu().numpy()
                     if  val_loss_npy < min(val_loss_tracker) or no_cp_for_current_epoch:
                         accelerator.wait_for_everyone()
                         unwrapped_model = accelerator.unwrap_model(model)
