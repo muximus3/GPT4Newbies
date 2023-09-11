@@ -128,7 +128,7 @@ def main(
         **kwargs,
     ):
         instruction = data_point["instruction"]
-        input = data_point["input"]
+        input = data_point.get("input", "")
         role = data_point.get("role", "")
         system = data_point.get("system_prompt", data_point.get("system", ""))
         # if system in instruction:
