@@ -7,6 +7,7 @@ import json
 import logging
 import tqdm
 from pathlib import Path
+import datasets
 import fnmatch
 
 sys.path.append(os.path.normpath(f'{os.path.dirname(os.path.abspath(__file__))}/..'))
@@ -99,3 +100,9 @@ def find_files_unrecu(directory, pattern):
     for filename in fnmatch.filter(os.listdir(directory), pattern):
         files.append(os.path.join(os.path.abspath(directory), filename))
     return files
+
+def load_dataset_from_path(data_path, split='train'):
+    extention_origin = data_path.split('.')[-1]
+    extention = 'json' if extention_origin == 'jsonl' else extention_origin
+    data = datasets.load_dataset(extention, data_files=data_path, split=split)
+    return data
