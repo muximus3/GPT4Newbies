@@ -66,7 +66,7 @@ class TrainArgs(BaseModel):
     weight_decay: float = 0.0
     max_to_keep_per_epoch: int = 1
     group_by_length: bool = False
-    eval_every: int = 200
+    eval_every: int = 100
     print_loss_every: int = 50
     log_grads_every: int = 400
     warmup_steps: int = 100

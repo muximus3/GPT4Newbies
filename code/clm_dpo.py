@@ -65,6 +65,7 @@ class TrainArgs(BaseModel):
     tokenizer_name: str
     dataset_path: str
     output_dir: str
+    run_name: str = "dpo_llama2"
     per_device_train_batch_size: int = 4
     per_device_eval_batch_size: int = 1
     gradient_accumulation_steps: int = 4
@@ -77,7 +78,7 @@ class TrainArgs(BaseModel):
     # the beta parameter for DPO loss
     beta: float = 0.1
 
-    max_steps: int = 1000
+    max_steps: int = 5000
     max_length: int = 1024
     logging_steps: int = 20
     save_steps: int = 500
@@ -128,12 +129,7 @@ def load_compare_dataset(dataset_path, val_set_size=0):
 
 
 def train(args: TrainArgs):
-    model = AutoPeftModelForCausalLM.from_pretrained(
-        args.model_name_or_path,
-        low_cpu_mem_usage=True,
-        torch_dtype=torch.float16,
-        load_in_4bit=True,
-    ) if args.lora else LlamaForCausalLM.from_pretrained(
+    model = LlamaForCausalLM.from_pretrained(
         args.model_name_or_path,
         low_cpu_mem_usage=True,
         torch_dtype=torch.float16,
@@ -144,23 +140,14 @@ def train(args: TrainArgs):
         model._ddp_params_and_buffers_to_ignore = [
             name for name, buffer in model.named_buffers() if buffer.dtype == torch.bool
         ]
-    model_ref = AutoPeftModelForCausalLM.from_pretrained(
-        args.model_name_or_path,
-        low_cpu_mem_usage=True,
-        torch_dtype=torch.float16,
-        load_in_4bit=True,
-    ) if args.lora else LlamaForCausalLM.from_pretrained(
-        args.model_name_or_path,
-        low_cpu_mem_usage=True,
-        torch_dtype=torch.float16,
-    )
+         
     tokenizer = LlamaTokenizer.from_pretrained(args.tokenizer_name)
     prebuild_tokenizer(tokenizer, model)
 
     train_dataset, val_dataset = load_compare_dataset(
         args.dataset_path, args.max_eval_num
     )
-
+    print(f'Train dataset: {len(train_dataset)}')
     # 4. initialize training arguments:
     training_args = TrainingArguments(
         per_device_train_batch_size=args.per_device_train_batch_size,
@@ -181,7 +168,7 @@ def train(args: TrainArgs):
         optim=args.optimizer_type,
         bf16=True,
         remove_unused_columns=False,
-        run_name="dpo_llama2",
+        run_name=args.run_name
     )
 
     peft_config = LoraConfig(
@@ -204,7 +191,6 @@ def train(args: TrainArgs):
     # 5. initialize the DPO trainer
     dpo_trainer = DPOTrainer(
         model,
-        model_ref,
         args=training_args,
         beta=args.beta,
         train_dataset=train_dataset,
