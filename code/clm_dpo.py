@@ -140,7 +140,11 @@ def train(args: TrainArgs):
         model._ddp_params_and_buffers_to_ignore = [
             name for name, buffer in model.named_buffers() if buffer.dtype == torch.bool
         ]
-         
+    ref_model = LlamaForCausalLM.from_pretrained(
+        args.model_name_or_path,
+        low_cpu_mem_usage=True,
+        torch_dtype=torch.float16,
+    ) 
     tokenizer = LlamaTokenizer.from_pretrained(args.tokenizer_name)
     prebuild_tokenizer(tokenizer, model)
 
@@ -191,6 +195,7 @@ def train(args: TrainArgs):
     # 5. initialize the DPO trainer
     dpo_trainer = DPOTrainer(
         model,
+        ref_model=ref_model,
         args=training_args,
         beta=args.beta,
         train_dataset=train_dataset,
