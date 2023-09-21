@@ -24,7 +24,7 @@ from accelerate.utils import DummyScheduler, DummyOptim, set_seed
 from accelerate.state import AcceleratorState
 from peft import AutoPeftModelForCausalLM, LoraConfig
 from deepspeed.accelerator import get_accelerator
-from peft import get_peft_model, LoraConfig, TaskType, prepare_model_for_int8_training
+from peft import get_peft_model, LoraConfig, TaskType, prepare_model_for_kbit_training
 from tqdm import tqdm
 from torchmetrics import MeanMetric
 from torch.utils.data import DataLoader
@@ -33,6 +33,7 @@ from transformers import (
     LlamaForCausalLM,
     LlamaTokenizer,
     TrainingArguments,
+    BitsAndBytesConfig,
 )
 from pydantic import BaseModel
 from typing import Union, List
@@ -56,7 +57,6 @@ from tokenizer_conversations import (
 )
 from data_utils import load_dataset_from_path
 
-torch.backends.cuda.matmul.allow_tf32 = True
 
 
 class TrainArgs(BaseModel):
@@ -70,13 +70,13 @@ class TrainArgs(BaseModel):
     per_device_eval_batch_size: int = 1
     gradient_accumulation_steps: int = 4
     gradient_checkpointing: bool = True
-    learning_rate: float = 5e-5
+    learning_rate: float = 2e-6
     lr_scheduler_type: str = "linear"
     warmup_steps: int = 50
     weight_decay: float = 0.0
     optimizer_type: str = "paged_adamw_32bit"
     # the beta parameter for DPO loss
-    beta: float = 0.1
+    beta: float = 0.2
 
     max_steps: int = 5000
     max_length: int = 1024
@@ -102,7 +102,12 @@ def load_compare_dataset(dataset_path, val_set_size=0):
 
     def format_data(sample):
         return {
-            "prompt": "System:\n" + sample["system_prompt"] + "\n\nHuman:\n" + sample["prompt"] + "\n\nAssistant:\n" if sample["system_prompt"] != ""
+            "prompt": "System:\n"
+            + sample["system_prompt"]
+            + "\n\nHuman:\n"
+            + sample["prompt"]
+            + "\n\nAssistant:\n"
+            if sample["system_prompt"] != ""
             else "Human:\n" + sample["prompt"] + "\n\nAssistant:\n",
             "chosen": sample["chosen"],
             "rejected": sample["rejected"],
@@ -129,29 +134,31 @@ def load_compare_dataset(dataset_path, val_set_size=0):
 
 
 def train(args: TrainArgs):
+    # bnb_config = BitsAndBytesConfig(
+    #     load_in_4bit=True,
+    #     bnb_4bit_quant_type="nf4",
+    #     bnb_4bit_compute_dtype=torch.bfloat16,
+    # )
     model = LlamaForCausalLM.from_pretrained(
         args.model_name_or_path,
+        torch_dtype=torch.bfloat16,
         low_cpu_mem_usage=True,
-        torch_dtype=torch.float16,
+        # quantization_config=bnb_config
     )
     model.config.use_cache = False
-    if args.ignore_bias_buffers:
-        # torch distributed hack
-        model._ddp_params_and_buffers_to_ignore = [
-            name for name, buffer in model.named_buffers() if buffer.dtype == torch.bool
-        ]
-    ref_model = LlamaForCausalLM.from_pretrained(
-        args.model_name_or_path,
-        low_cpu_mem_usage=True,
-        torch_dtype=torch.float16,
-    ) 
+    # model = prepare_model_for_kbit_training(model)
+    # ref_model = LlamaForCausalLM.from_pretrained(
+    #     args.model_name_or_path,
+    #     torch_dtype=torch.bfloat16,
+    #     low_cpu_mem_usage=True,
+    # )
     tokenizer = LlamaTokenizer.from_pretrained(args.tokenizer_name)
     prebuild_tokenizer(tokenizer, model)
 
     train_dataset, val_dataset = load_compare_dataset(
         args.dataset_path, args.max_eval_num
     )
-    print(f'Train dataset: {len(train_dataset)}')
+    print(f"Train dataset: {len(train_dataset)}")
     # 4. initialize training arguments:
     training_args = TrainingArguments(
         per_device_train_batch_size=args.per_device_train_batch_size,
@@ -172,30 +179,35 @@ def train(args: TrainArgs):
         optim=args.optimizer_type,
         bf16=True,
         remove_unused_columns=False,
-        run_name=args.run_name
+        run_name=args.run_name,
     )
 
-    peft_config = LoraConfig(
-        r=args.lora_r,
-        lora_alpha=args.lora_alpha,
-        lora_dropout=args.lora_dropout,
-        target_modules=[
-            "q_proj",
-            "v_proj",
-            "k_proj",
-            "out_proj",
-            "fc_in",
-            "fc_out",
-            "wte",
-        ],
-        bias="none",
-        task_type="CAUSAL_LM",
-    ) if args.lora else None
-
+    peft_config = (
+        LoraConfig(
+            r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            target_modules=[
+                "q_proj",
+                "v_proj",
+                "k_proj",
+                "out_proj",
+                "fc_in",
+                "fc_out",
+                "wte",
+            ],
+            bias="none",
+            task_type="CAUSAL_LM",
+        )
+        if args.lora
+        else None
+    )
+    # model = get_peft_model(model, peft_config)
+    # model.print_trainable_parameters()
     # 5. initialize the DPO trainer
     dpo_trainer = DPOTrainer(
         model,
-        ref_model=ref_model,
+        # ref_model=ref_model,
         args=training_args,
         beta=args.beta,
         train_dataset=train_dataset,
