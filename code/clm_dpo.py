@@ -134,17 +134,17 @@ def load_compare_dataset(dataset_path, val_set_size=0):
 
 
 def train(args: TrainArgs):
-    # bnb_config = BitsAndBytesConfig(
-    #     load_in_4bit=True,
-    #     bnb_4bit_quant_type="nf4",
-    #     bnb_4bit_compute_dtype=torch.bfloat16,
-    # )
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16,
+    )
     model = LlamaForCausalLM.from_pretrained(
         args.model_name_or_path,
         torch_dtype=torch.bfloat16,
-        load_in_4bit=True,
-        # low_cpu_mem_usage=True,
-        # quantization_config=bnb_config
+        # load_in_4bit=True,
+        low_cpu_mem_usage=True,
+        quantization_config=bnb_config
     )
     model.config.use_cache = False
     # model = prepare_model_for_kbit_training(model)
