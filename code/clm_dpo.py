@@ -142,7 +142,8 @@ def train(args: TrainArgs):
     model = LlamaForCausalLM.from_pretrained(
         args.model_name_or_path,
         torch_dtype=torch.bfloat16,
-        low_cpu_mem_usage=True,
+        load_in_4bit=True,
+        # low_cpu_mem_usage=True,
         # quantization_config=bnb_config
     )
     model.config.use_cache = False
