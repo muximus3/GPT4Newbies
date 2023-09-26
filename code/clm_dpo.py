@@ -76,7 +76,7 @@ class TrainArgs(BaseModel):
     weight_decay: float = 0.0
     optimizer_type: str = "paged_adamw_32bit"
     # the beta parameter for DPO loss
-    beta: float = 0.2
+    beta: float = 0.1
 
     max_steps: int = 5000
     max_length: int = 1024
