@@ -31,8 +31,8 @@ def prebuild_tokenizer(tokenizer, model=None):
     origin_tokenizer_len = len(tokenizer)
     if tokenizer.pad_token is None:
         tokenizer.pad_token_id = tokenizer.unk_token_id
-    tokenizer.bos_token_id = 1
-    tokenizer.eos_token_id = 2
+    # tokenizer.bos_token_id = 1
+    # tokenizer.eos_token_id = 2
     tokenizer.padding_side = "right"
     new_tokenizer_len = len(tokenizer)
     if origin_tokenizer_len != new_tokenizer_len and model:

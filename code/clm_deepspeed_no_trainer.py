@@ -66,7 +66,7 @@ class TrainArgs(BaseModel):
     weight_decay: float = 0.0
     max_to_keep_per_epoch: int = 1
     group_by_length: bool = False
-    eval_every: int = 100
+    eval_every: int = 400
     print_loss_every: int = 50
     log_grads_every: int = 400
     warmup_steps: int = 100
@@ -122,11 +122,11 @@ def train(accelerator, config: TrainArgs):
     accelerator.print(config)
     accelerator.print(f"Using {accelerator.num_processes} GPUs")
 
-    tokenizer = LlamaTokenizer.from_pretrained(config.tokenizer_name)
+    tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_name)
 
     checkpoint = config.gradient_checkpointing
     # A device map needs to be passed to run convert models into mixed-int8 format. Please run`.from_pretrained` with `device_map='auto'
-    model = LlamaForCausalLM.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
         config.model_name,
         use_cache=False if checkpoint else True,
         torch_dtype=torch.float16,
@@ -335,7 +335,7 @@ def train(accelerator, config: TrainArgs):
 
                 # save best model
                 val_loss_npy = np.round(log_val["val_loss"].cpu().numpy(), 3)
-                if step >= (0.98 * (1 - epoch/config.num_epochs)) * len(train_dataloader):
+                if step >= (0.98 * (1 - epoch/config.num_epochs)) * len(train_dataloader) and len(val_loss_tracker) > 0:
                     no_cp_for_current_epoch = step >= len(train_dataloader) - 1 and len(find_files_unrecu(config.output_dir, f'epoch_{epoch}_*')) == 0
                     if  val_loss_npy < min(val_loss_tracker) or no_cp_for_current_epoch:
                         accelerator.wait_for_everyone()
@@ -375,12 +375,19 @@ def train(accelerator, config: TrainArgs):
         # this happens when there is high memory pressure and is detrimental to performance.
         # if this is happening frequently consider adjusting settings to reduce memory consumption.
         # If you are unable to make the cache flushes go away consider adding get_accelerator().empty_cache() calls in your training loop to ensure that all ranks flush their caches at the same time
-        get_accelerator().empty_cache()
+        # get_accelerator().empty_cache()
 
         accelerator.print(f"Epoch {epoch} finished")
         # accelerator.print(f"Saving checkpoint to:{config.output_dir}")
-        # accelerator.wait_for_everyone()
-        # unwrapped_model = accelerator.unwrap_model(model)
+        accelerator.wait_for_everyone()
+        unwrapped_model = accelerator.unwrap_model(model)
+        unwrapped_model.save_pretrained(
+            f"{config.output_dir}/epoch_{epoch}",
+            is_main_process=accelerator.is_main_process,
+            save_function=accelerator.save,
+            state_dict=accelerator.get_state_dict(model),
+        )
+        tokenizer.save_pretrained(f"{config.output_dir}/epoch_{epoch}")
         # try:
         #     if accelerator.is_main_process and config.save_name:
         #         unwrapped_model.push_to_hub(config.save_name + f"-epoch_{epoch}", private=True)

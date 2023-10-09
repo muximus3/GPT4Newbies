@@ -157,7 +157,7 @@ def test_tokenizer(
     print(f'inputs ids mean len: {np.mean(inputs_ids_len)}, max len: {max(inputs_ids_len)}, min len: {min(inputs_ids_len)}')
     print(f'old: {old_len}, new:{new_len}')
     print(f'dataset train: {len(train_data)}')
-    print(inputs_ids_len[:1000])
+    print(f'inputs_ids_len: {inputs_ids_len[:1000]}')
 
 
 def main(
@@ -173,7 +173,7 @@ def main(
     assert base_model, (
         "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
     )
-    tokenizer = LlamaTokenizer.from_pretrained(base_model)
+    tokenizer = AutoTokenizer.from_pretrained(base_model)
     kargs = {
         "dataset_paths": dataset_paths, 
         "tokenizer": tokenizer, 

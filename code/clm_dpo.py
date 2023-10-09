@@ -47,6 +47,7 @@ from trl import (
     DPOTrainer,
 )
 from trl.core import respond_to_batch
+from trl.trainer.utils import DPODataCollatorWithPadding
 import wandb
 
 sys.path.append(os.path.normpath(f"{os.path.dirname(os.path.abspath(__file__))}/.."))
@@ -56,7 +57,7 @@ from tokenizer_conversations import (
     load_tokenized_conversation_dataset,
 )
 from data_utils import load_dataset_from_path
-
+from dpo_trainer import CustomDPOTrainer
 
 
 class TrainArgs(BaseModel):
@@ -65,7 +66,6 @@ class TrainArgs(BaseModel):
     tokenizer_name: str
     dataset_path: str
     output_dir: str
-    run_name: str = "dpo_llama2"
     per_device_train_batch_size: int = 4
     per_device_eval_batch_size: int = 1
     gradient_accumulation_steps: int = 4
@@ -76,7 +76,7 @@ class TrainArgs(BaseModel):
     weight_decay: float = 0.0
     optimizer_type: str = "paged_adamw_32bit"
     # the beta parameter for DPO loss
-    beta: float = 0.1
+    beta: float = 0.2
 
     max_steps: int = 5000
     max_length: int = 1024
@@ -92,8 +92,21 @@ class TrainArgs(BaseModel):
     lora_r: int = 8
 
     report_to: str = "wandb"
+    run_name: str = "dpo_llama2"
     ignore_bias_buffers: bool = False
 
+# Custom Defined Metric
+def compute_metrics(eval_preds):
+    # preds shape: (sample, )
+    # labels shape: (sample, )
+    preds, labels = eval_preds
+
+    acc_mean = preds.mean()
+    eval_dict = {
+        'rewards/accuracies':acc_mean
+    }
+    
+    return eval_dict
 
 def load_compare_dataset(dataset_path, val_set_size=0):
     # data = {'id': '', 'system_prompt': '', 'dataset_name': '', 'prompt': '', 'chosen': '', 'rejected': ''}
@@ -139,12 +152,13 @@ def train(args: TrainArgs):
         bnb_4bit_quant_type="nf4",
         bnb_4bit_compute_dtype=torch.bfloat16,
     )
+    device_map = {"": Accelerator().local_process_index}
     model = LlamaForCausalLM.from_pretrained(
         args.model_name_or_path,
         torch_dtype=torch.bfloat16,
-        # load_in_4bit=True,
         low_cpu_mem_usage=True,
-        quantization_config=bnb_config
+        quantization_config=bnb_config,
+        device_map=device_map
     )
     model.config.use_cache = False
     # model = prepare_model_for_kbit_training(model)
@@ -152,6 +166,8 @@ def train(args: TrainArgs):
     #     args.model_name_or_path,
     #     torch_dtype=torch.bfloat16,
     #     low_cpu_mem_usage=True,
+    #     quantization_config=bnb_config,
+    #     device_map=device_map
     # )
     tokenizer = LlamaTokenizer.from_pretrained(args.tokenizer_name)
     prebuild_tokenizer(tokenizer, model)
@@ -215,8 +231,11 @@ def train(args: TrainArgs):
         eval_dataset=val_dataset,
         tokenizer=tokenizer,
         peft_config=peft_config,
-        max_prompt_length=args.max_prompt_length,
-        max_length=args.max_length,
+        data_collator=DPODataCollatorWithPadding(tokenizer=tokenizer, padding=True, max_length=args.max_length,                                                  
+                                                 max_prompt_length=args.max_prompt_length, 
+                                                 label_pad_token_id=-100, 
+                                                 padding_value=0,
+                                                 truncation_mode='keep_end')
     )
 
     # 6. train
