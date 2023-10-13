@@ -55,6 +55,7 @@ class TrainArgs(BaseModel):
     streaming: bool = False
     train_on_inputs = True
     gradient_checkpointing: bool = True
+    padding_side: str = 'left'
 
     num_epochs: int = 4
     max_length: int = 1024
@@ -133,7 +134,7 @@ def train(accelerator, config: TrainArgs):
         # device_map="auto",
     )
 
-    prebuild_tokenizer(tokenizer, model)
+    prebuild_tokenizer(tokenizer, model, padding_side=config.padding_side)
     with accelerator.main_process_first():
         # train_dataset, val_dataset = load_tokenized_dataset_alpaca(
         #     tokenizer,

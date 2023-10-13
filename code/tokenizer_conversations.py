@@ -27,13 +27,13 @@ DEFAULT_BOS_TOKEN = "<s>"
 DEFAULT_UNK_TOKEN = "<unk>"
 
 
-def prebuild_tokenizer(tokenizer, model=None):
+def prebuild_tokenizer(tokenizer, model=None, padding_side="left"):
     origin_tokenizer_len = len(tokenizer)
     if tokenizer.pad_token is None:
         tokenizer.pad_token_id = tokenizer.unk_token_id
     # tokenizer.bos_token_id = 1
     # tokenizer.eos_token_id = 2
-    tokenizer.padding_side = "right"
+    tokenizer.padding_side = padding_side
     new_tokenizer_len = len(tokenizer)
     if origin_tokenizer_len != new_tokenizer_len and model:
         print(f"resize embeddings from {origin_tokenizer_len} to {new_tokenizer_len}")

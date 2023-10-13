@@ -47,7 +47,8 @@ def main(
     # Allows to listen on all interfaces by providing '0.
     server_name: str = "0.0.0.0",
     share_gradio: bool = False,
-    template_file: str = None
+    template_file: str = None,
+    padding_side: str = "left"
 ):
     assert model_name_or_path, (
         "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
@@ -73,7 +74,7 @@ def main(
             torch_dtype=torch.bfloat16,
             device_map="auto",
         )
-        prebuild_tokenizer(tokenizer, model)
+        prebuild_tokenizer(tokenizer, model, padding_side=padding_side)
         if lora:
             model = PeftModel.from_pretrained(
                 model,
@@ -88,7 +89,7 @@ def main(
             device_map={"": device},
             torch_dtype=torch.float16,
         )
-        prebuild_tokenizer(tokenizer, model)
+        prebuild_tokenizer(tokenizer, model, padding_side=padding_side)
         if lora:
             model = PeftModel.from_pretrained(
                 model,
@@ -100,7 +101,7 @@ def main(
         model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path, device_map={"": device}, low_cpu_mem_usage=True
         )
-        prebuild_tokenizer(tokenizer, model)
+        prebuild_tokenizer(tokenizer, model, padding_side=padding_side)
         if lora:
             model = PeftModel.from_pretrained(
                 model,
