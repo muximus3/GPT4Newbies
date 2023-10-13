@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from transformers import LlamaForCausalLM, LlamaTokenizer, GenerationConfig
+from transformers import LlamaForCausalLM, LlamaTokenizer, GenerationConfig, AutoTokenizer, AutoModelForCausalLM
 import os
 import sys
 import numpy as np
@@ -64,12 +64,13 @@ def main(
 
     if not template_file:
         raise AssertionError(f'Please specify a template file for Prompter')
-    tokenizer = LlamaTokenizer.from_pretrained(tokenizer_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path)
     if device == "cuda":
-        model = LlamaForCausalLM.from_pretrained(
+        print('cuda')
+        model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path,
             load_in_8bit=load_8bit,
-            torch_dtype=torch.float16,
+            torch_dtype=torch.bfloat16,
             device_map="auto",
         )
         prebuild_tokenizer(tokenizer, model)
@@ -81,7 +82,8 @@ def main(
                 # device_map={'': 0} # fix AttributeError: 'NoneType' object has no attribute 'device'
             )
     elif device == "mps":
-        model = LlamaForCausalLM.from_pretrained(
+        print('mps')
+        model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path,
             device_map={"": device},
             torch_dtype=torch.float16,
@@ -95,7 +97,7 @@ def main(
                 torch_dtype=torch.float16,
             )
     else:
-        model = LlamaForCausalLM.from_pretrained(
+        model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path, device_map={"": device}, low_cpu_mem_usage=True
         )
         prebuild_tokenizer(tokenizer, model)
@@ -110,9 +112,6 @@ def main(
     if not lora and os.path.isfile(state_dict_path):
         model.load_state_dict(torch.load(state_dict_path))
     prompter = AlpacaPrompter(template_file)
-    if not load_8bit:
-        # seems to fix bugs for some users.
-        model.half()
 
     if torch.__version__ >= "2" and sys.platform != "win32":
         model = torch.compile(model)

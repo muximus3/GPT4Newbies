@@ -66,7 +66,7 @@ class TrainArgs(BaseModel):
     tokenizer_name: str
     dataset_path: str
     output_dir: str
-    per_device_train_batch_size: int = 4
+    per_device_train_batch_size: int = 8
     per_device_eval_batch_size: int = 1
     gradient_accumulation_steps: int = 4
     gradient_checkpointing: bool = True
@@ -147,18 +147,18 @@ def load_compare_dataset(dataset_path, val_set_size=0):
 
 
 def train(args: TrainArgs):
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16,
-    )
+    # bnb_config = BitsAndBytesConfig(
+    #     load_in_4bit=True,
+    #     bnb_4bit_quant_type="nf4",
+    #     bnb_4bit_compute_dtype=torch.bfloat16,
+    # )
     device_map = {"": Accelerator().local_process_index}
     model = LlamaForCausalLM.from_pretrained(
         args.model_name_or_path,
         torch_dtype=torch.bfloat16,
-        low_cpu_mem_usage=True,
-        quantization_config=bnb_config,
-        device_map=device_map
+        # low_cpu_mem_usage=True,
+        # quantization_config=bnb_config,
+        # device_map=device_map
     )
     model.config.use_cache = False
     # model = prepare_model_for_kbit_training(model)
@@ -170,7 +170,7 @@ def train(args: TrainArgs):
     #     device_map=device_map
     # )
     tokenizer = LlamaTokenizer.from_pretrained(args.tokenizer_name)
-    prebuild_tokenizer(tokenizer, model)
+    tokenizer.pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.unk_token_id
 
     train_dataset, val_dataset = load_compare_dataset(
         args.dataset_path, args.max_eval_num
@@ -222,7 +222,7 @@ def train(args: TrainArgs):
     # model = get_peft_model(model, peft_config)
     # model.print_trainable_parameters()
     # 5. initialize the DPO trainer
-    dpo_trainer = DPOTrainer(
+    dpo_trainer = CustomDPOTrainer(
         model,
         # ref_model=ref_model,
         args=training_args,
@@ -231,13 +231,15 @@ def train(args: TrainArgs):
         eval_dataset=val_dataset,
         tokenizer=tokenizer,
         peft_config=peft_config,
+        # max_prompt_length=args.max_prompt_length,
+        # max_length=args.max_length,
         data_collator=DPODataCollatorWithPadding(tokenizer=tokenizer, padding=True, max_length=args.max_length,                                                  
                                                  max_prompt_length=args.max_prompt_length, 
                                                  label_pad_token_id=-100, 
                                                  padding_value=0,
                                                  truncation_mode='keep_end')
     )
-
+    dpo_trainer.compute_metrics = compute_metrics
     # 6. train
     dpo_trainer.train()
     dpo_trainer.save_model(args.output_dir)
