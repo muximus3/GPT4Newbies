@@ -73,8 +73,7 @@ def main(
             torch_dtype=torch.bfloat16,
             device_map="auto",
         )
-        # prebuild_tokenizer(tokenizer, model)
-        tokenizer.pad_token_id = tokenizer.unk_token_id
+        prebuild_tokenizer(tokenizer, model)
         if lora:
             model = PeftModel.from_pretrained(
                 model,
@@ -148,7 +147,9 @@ def main(
             max_new_tokens=max_new_tokens,
             # repetition_penalty=1.2,
             # no_repeat_ngram_size=2,
-            # eos_token_id=tokenizer.eos_token_id,
+            pad_token_id=tokenizer.pad_token_id,
+            bos_token_id=tokenizer.bos_token_id,
+            eos_token_id=tokenizer.eos_token_id,
             # length_penalty=0.6,
             # early_stopping=True,
             **kwargs,
