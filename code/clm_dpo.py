@@ -148,13 +148,13 @@ def train(args: TrainArgs):
     )
     model.config.use_cache = False
     # model = prepare_model_for_kbit_training(model)
-    # ref_model = LlamaForCausalLM.from_pretrained(
-    #     args.model_name_or_path,
-    #     torch_dtype=torch.bfloat16,
+    ref_model = LlamaForCausalLM.from_pretrained(
+        args.model_name_or_path,
+        torch_dtype=torch.bfloat16,
         # low_cpu_mem_usage=True,
         # quantization_config=bnb_config,
         # device_map=device_map
-    # )
+    )
     tokenizer = LlamaTokenizer.from_pretrained(args.tokenizer_name)
     tokenizer.pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.unk_token_id
 
@@ -210,7 +210,7 @@ def train(args: TrainArgs):
     # 5. initialize the DPO trainer
     dpo_trainer = DPOTrainer(
         model,
-        # ref_model=ref_model,
+        ref_model=ref_model,
         args=training_args,
         beta=args.beta,
         train_dataset=train_dataset,
@@ -227,7 +227,7 @@ def train(args: TrainArgs):
     )
     # dpo_trainer.compute_metrics = compute_metrics
     # 6. train
-    dpo_trainer.ref_model = Accelerator().prepare(dpo_trainer.ref_model)
+    # dpo_trainer.ref_model = Accelerator().prepare(dpo_trainer.ref_model)
     dpo_trainer.train()
     dpo_trainer.save_model(args.output_dir)
 
