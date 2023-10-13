@@ -57,7 +57,6 @@ from tokenizer_conversations import (
     load_tokenized_conversation_dataset,
 )
 from data_utils import load_dataset_from_path
-from dpo_trainer import CustomDPOTrainer
 
 
 class TrainArgs(BaseModel):
@@ -66,9 +65,9 @@ class TrainArgs(BaseModel):
     tokenizer_name: str
     dataset_path: str
     output_dir: str
-    per_device_train_batch_size: int = 8
+    per_device_train_batch_size: int = 4
     per_device_eval_batch_size: int = 1
-    gradient_accumulation_steps: int = 4
+    gradient_accumulation_steps: int = 2
     gradient_checkpointing: bool = True
     learning_rate: float = 2e-6
     lr_scheduler_type: str = "linear"
@@ -94,19 +93,6 @@ class TrainArgs(BaseModel):
     report_to: str = "wandb"
     run_name: str = "dpo_llama2"
     ignore_bias_buffers: bool = False
-
-# Custom Defined Metric
-def compute_metrics(eval_preds):
-    # preds shape: (sample, )
-    # labels shape: (sample, )
-    preds, labels = eval_preds
-
-    acc_mean = preds.mean()
-    eval_dict = {
-        'rewards/accuracies':acc_mean
-    }
-    
-    return eval_dict
 
 def load_compare_dataset(dataset_path, val_set_size=0):
     # data = {'id': '', 'system_prompt': '', 'dataset_name': '', 'prompt': '', 'chosen': '', 'rejected': ''}
@@ -152,7 +138,7 @@ def train(args: TrainArgs):
     #     bnb_4bit_quant_type="nf4",
     #     bnb_4bit_compute_dtype=torch.bfloat16,
     # )
-    device_map = {"": Accelerator().local_process_index}
+    # device_map = {"": Accelerator().local_process_index}
     model = LlamaForCausalLM.from_pretrained(
         args.model_name_or_path,
         torch_dtype=torch.bfloat16,
@@ -165,9 +151,9 @@ def train(args: TrainArgs):
     # ref_model = LlamaForCausalLM.from_pretrained(
     #     args.model_name_or_path,
     #     torch_dtype=torch.bfloat16,
-    #     low_cpu_mem_usage=True,
-    #     quantization_config=bnb_config,
-    #     device_map=device_map
+        # low_cpu_mem_usage=True,
+        # quantization_config=bnb_config,
+        # device_map=device_map
     # )
     tokenizer = LlamaTokenizer.from_pretrained(args.tokenizer_name)
     tokenizer.pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.unk_token_id
@@ -222,7 +208,7 @@ def train(args: TrainArgs):
     # model = get_peft_model(model, peft_config)
     # model.print_trainable_parameters()
     # 5. initialize the DPO trainer
-    dpo_trainer = CustomDPOTrainer(
+    dpo_trainer = DPOTrainer(
         model,
         # ref_model=ref_model,
         args=training_args,
@@ -231,16 +217,17 @@ def train(args: TrainArgs):
         eval_dataset=val_dataset,
         tokenizer=tokenizer,
         peft_config=peft_config,
-        # max_prompt_length=args.max_prompt_length,
-        # max_length=args.max_length,
-        data_collator=DPODataCollatorWithPadding(tokenizer=tokenizer, padding=True, max_length=args.max_length,                                                  
-                                                 max_prompt_length=args.max_prompt_length, 
-                                                 label_pad_token_id=-100, 
-                                                 padding_value=0,
-                                                 truncation_mode='keep_end')
+        max_prompt_length=args.max_prompt_length,
+        max_length=args.max_length,
+        # data_collator=DPODataCollatorWithPadding(tokenizer=tokenizer, padding=True, max_length=args.max_length,                                                  
+        #                                          max_prompt_length=args.max_prompt_length, 
+        #                                          label_pad_token_id=-100, 
+        #                                          padding_value=0,
+        #                                          truncation_mode='keep_end')
     )
-    dpo_trainer.compute_metrics = compute_metrics
+    # dpo_trainer.compute_metrics = compute_metrics
     # 6. train
+    dpo_trainer.ref_model = Accelerator().prepare(dpo_trainer.ref_model)
     dpo_trainer.train()
     dpo_trainer.save_model(args.output_dir)
 

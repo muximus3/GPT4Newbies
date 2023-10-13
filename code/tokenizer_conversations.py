@@ -264,7 +264,7 @@ def load_conversation_dataset_from_paths(
         raw_datasets = concatenate_datasets(raw_datasets_list)
     assert len({"conversations"} - set(raw_datasets.column_names)) == 0, raw_datasets.column_names
     raw_datasets = raw_datasets.filter(
-        lambda example: len(example["conversations"])> 1 and example["conversations"][0]["from"].lower() in ["human", "user"] ,
+        lambda example: len(example["conversations"])> 1 and example["conversations"][0].get("from", example["conversations"][0].get("role", "")).lower() in ["human", "user"] ,
         num_proc=mp.cpu_count() -1,
         desc="Remove empty conversations",
     )
