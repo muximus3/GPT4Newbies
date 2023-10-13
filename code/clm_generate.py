@@ -73,7 +73,8 @@ def main(
             torch_dtype=torch.bfloat16,
             device_map="auto",
         )
-        prebuild_tokenizer(tokenizer, model)
+        # prebuild_tokenizer(tokenizer, model)
+        tokenizer.pad_token_id = tokenizer.unk_token_id
         if lora:
             model = PeftModel.from_pretrained(
                 model,
@@ -140,7 +141,7 @@ def main(
         generation_config = GenerationConfig(
             # temperature=temperature,
             # top_p=top_p,
-            top_k=top_k,
+            # top_k=top_k,
             # do_sample=True,
             # num_beams=num_beams,
             # min_new_tokens=1,
