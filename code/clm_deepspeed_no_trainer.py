@@ -51,7 +51,6 @@ class TrainArgs(BaseModel):
     tokenizer_name: str
     dataset_paths: List[str]
     output_dir: str
-    prompt_template_path: str
     save_name: str = None
     train_on_inputs = False
     gradient_checkpointing: bool = True

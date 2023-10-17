@@ -165,7 +165,7 @@ def test_tokenizer(
 def main(
     dataset_paths= list[str],
     base_model: str = "/data/zhangchong/llm_models/llama-7b-hf",
-    prompt_template_file_name: str = "./templates/alpaca_short.json",
+    prompter_name: str = "llama",
     cut_off_len: int = 100,
     train_on_inputs: bool = False,
     sample_ids: list = [1230, 2394, 2332, 9],
@@ -182,7 +182,7 @@ def main(
         "cutoff_len": cut_off_len,
         "train_on_inputs": train_on_inputs, 
         "sample_ids": sample_ids,
-        "prompt_template_file_name": prompt_template_file_name,
+        "prompter_name": prompter_name,
         "group_by_length": group_by_length
         }
     print(kargs)

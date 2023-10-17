@@ -1,8 +1,0 @@
-{
-    "description": "we add system message and role",
-    "system": "现在你是一个对人类有帮助的{role}.",
-    "prompt_input": "\n\n人类:\n{instruction}\n{input}\n\n{role}:\n",
-    "prompt_no_input": "\n\n人类:\n{instruction}\n\n{role}:\n",
-    "response_split": "{role}:",    
-    "default_role": "AI助手"
-}

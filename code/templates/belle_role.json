@@ -1,8 +1,0 @@
-{
-    "description": "belle template to experiment with.",
-    "system": "",
-    "prompt_input": "Human:\n{instruction}\n{input}\n\n{role}:\n",
-    "prompt_no_input": "Human:\n{instruction}\n\n{role}:\n",
-    "response_split": "{role}:",  
-    "default_role": "Assistant"
-}

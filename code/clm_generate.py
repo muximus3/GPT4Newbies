@@ -124,13 +124,12 @@ def main(
     ):
         instruction = data_point["instruction"]
         input = data_point.get("input", "")
-        role = data_point.get("role", "")
         system = data_point.get("system_prompt", data_point.get("system", ""))
         # if system in instruction:
         instruction = instruction.replace(system, '').strip()
-        prompt = prompter.user_prompt(instruction=instruction, input_ctx=input, role=role, system=system)
+        prompt = prompter.user_prompt(instruction=instruction+" "+input, system=system)
         # print(prompt)
-        features = tokenizer(prompt, return_tensors="pt", add_special_tokens=False)
+        features = tokenizer(prompt, return_tensors="pt", add_special_tokens=True)
         input_ids = features['input_ids'].to("cuda")
         attention_mask = features['attention_mask'].to("cuda")
         generation_config = GenerationConfig(
@@ -163,8 +162,9 @@ def main(
         output = tokenizer.decode(
             s, skip_special_tokens=True, clean_up_tokenization_spaces=True)
         print('-'*40)
+        print(f'inputs decode:{tokenizer.decode(input_ids[0])}')
         print(f'raw_output:\n{output}')
-        format_out = prompter.format_response(output, role=data_point.get("role", ""))
+        format_out = prompter.format_response(output, prompt=prompt)
         model_name = lora_weights if lora else os.path.basename(state_dict_path)
         model_name = model_name if model_name else model_name_or_path
         if test_output_file:
