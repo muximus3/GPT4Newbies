@@ -20,7 +20,6 @@ sys.path.append(os.path.normpath(
     f"{os.path.dirname(os.path.abspath(__file__))}/.."))
 from prompter import AlpacaPrompter
 from data_utils import  get_left_data, df_reader
-from tokenizer_conversations import prebuild_tokenizer
 logger = logging.getLogger(__name__)
 
 
@@ -48,7 +47,6 @@ def main(
     server_name: str = "0.0.0.0",
     share_gradio: bool = False,
     template_file: str = None,
-    padding_side: str = "left"
 ):
     assert model_name_or_path, (
         "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
@@ -74,7 +72,6 @@ def main(
             torch_dtype=torch.bfloat16,
             device_map="auto",
         )
-        prebuild_tokenizer(tokenizer, model, padding_side=padding_side)
         if lora:
             model = PeftModel.from_pretrained(
                 model,
@@ -89,7 +86,6 @@ def main(
             device_map={"": device},
             torch_dtype=torch.float16,
         )
-        prebuild_tokenizer(tokenizer, model, padding_side=padding_side)
         if lora:
             model = PeftModel.from_pretrained(
                 model,
@@ -101,7 +97,6 @@ def main(
         model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path, device_map={"": device}, low_cpu_mem_usage=True
         )
-        prebuild_tokenizer(tokenizer, model, padding_side=padding_side)
         if lora:
             model = PeftModel.from_pretrained(
                 model,

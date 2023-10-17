@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 from tokenizer_conversations import (
     prebuild_tokenizer,
     load_tokenized_conversation_dataset,
+    get_prompter
 )
 from data_utils import find_files_unrecu
 
@@ -52,13 +53,14 @@ class TrainArgs(BaseModel):
     output_dir: str
     prompt_template_path: str
     save_name: str = None
-    streaming: bool = False
-    train_on_inputs = True
+    train_on_inputs = False
     gradient_checkpointing: bool = True
-    padding_side: str = 'left'
+    padding_side: str = 'right'
+    prompter_name: str = 'llama'
 
     num_epochs: int = 4
     max_length: int = 1024
+    complete_alpha: float = 0.5
     micro_batch_size: int = 1
     num_proc: int = 64
 
@@ -117,6 +119,9 @@ def manage_checkpoint_files(output_dir, epoch, max_to_keep_per_epoch=1):
     else:
         return files, []
 
+
+
+
 def train(accelerator, config: TrainArgs):
     set_seed(config.seed)
     accelerator.free_memory()
@@ -135,21 +140,12 @@ def train(accelerator, config: TrainArgs):
     )
 
     prebuild_tokenizer(tokenizer, model, padding_side=config.padding_side)
+    prompter = get_prompter(config.prompter_name, tokenizer, config.train_on_inputs, config.max_length, config.complete_alpha)
     with accelerator.main_process_first():
-        # train_dataset, val_dataset = load_tokenized_dataset_alpaca(
-        #     tokenizer,
-        #     config.dataset_paths,
-        #     config.max_eval_num,
-        #     config.prompt_template_path,
-        #     config.max_length,
-        #     config.train_on_inputs,
-        # )
         train_dataset, val_dataset = load_tokenized_conversation_dataset(
-            tokenizer,
-            config.dataset_paths,
+            prompter=prompter,
+            dataset_paths=config.dataset_paths,
             val_set_size=config.max_eval_num,
-            cutoff_len=config.max_length,
-            train_on_inputs=config.train_on_inputs,
             group_by_length=config.group_by_length
         )
 

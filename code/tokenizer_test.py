@@ -12,6 +12,7 @@ import fire
 import string
 import transformers
 from datasets import load_dataset, Dataset
+import datasets
 from dataclasses import dataclass
 from functools import partial
 from typing import Dict, Sequence
@@ -31,6 +32,7 @@ sys.path.append(os.path.normpath(f"{os.path.dirname(os.path.abspath(__file__))}/
 logger = logging.getLogger(__name__)
 from tokenizer_conversations import *
 
+datasets.disable_caching()
 
 def print_sample(batch_examples, tokenizer: transformers.PreTrainedTokenizer, skip_s=False):
     """
@@ -128,12 +130,12 @@ def test_tokenizer(
     #                                                   train_on_inputs=train_on_inputs, 
     #                                                   select_samples=sample_ids)
 
+    prompter = get_prompter(prompt_template_file_name, tokenizer, train_on_inputs, cutoff_len, 0.2)
+    print(type(prompter))
     train_data, val_data = load_tokenized_conversation_dataset(
-        tokenizer,
+        prompter,
         dataset_paths,
         val_set_size=0,
-        cutoff_len=cutoff_len,
-        train_on_inputs=train_on_inputs,
         select_samples=sample_ids,
         group_by_length=group_by_length
     )
