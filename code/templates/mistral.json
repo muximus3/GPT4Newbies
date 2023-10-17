@@ -1,0 +1,5 @@
+{
+    "description": "belle template to experiment with.",
+    "prompt": "[INST] {system}{instruction} [/INST]",
+    "prompt_no_system": "[INST] {instruction} [/INST]"
+}
