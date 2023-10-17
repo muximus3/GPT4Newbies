@@ -317,9 +317,6 @@ def train(accelerator, config: TrainArgs):
                         {"train_loss": train_loss.compute()}, step=curr_step
                     )
 
-            #     curr_step = step + epoch * len(train_dataloader)
-            #     accelerator.save_state(f"{config.output_dir}/step_{curr_step}")
-
             if step > 0 and (
                 step % config.eval_every == 0 or step == len(train_dataloader) - 1
             ):
@@ -337,25 +334,29 @@ def train(accelerator, config: TrainArgs):
                     if  val_loss_npy < min(val_loss_tracker) or no_cp_for_current_epoch:
                         accelerator.wait_for_everyone()
                         unwrapped_model = accelerator.unwrap_model(model)
-                        checkpoint_dir = f"{config.output_dir}/epoch_{epoch}_step_{step}_loss_{val_loss_npy}"
-                        accelerator.print(f'Saving checkpoint:{checkpoint_dir}, epoch:{epoch}, step:{step}, loss:{val_loss_npy}\n Loss trcker:{val_loss_tracker}')
-                        unwrapped_model.save_pretrained(
-                            checkpoint_dir,
-                            is_main_process=accelerator.is_main_process,
-                            save_function=accelerator.save,
-                            state_dict=accelerator.get_state_dict(model),
-                        )
-                        tokenizer.save_pretrained(checkpoint_dir)
-                    if step % (2 * config.eval_every) == 0 and os.path.isdir(config.output_dir):
-                        keep_files, remove_files = manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch, epoch)   
-                        if len(remove_files) > 0:
-                            accelerator.print(f'keep epoch files: {keep_files}\nremove epoch files: {remove_files}')
-                            for remove_file in remove_files:
-                                try:
-                                    shutil.rmtree(remove_file)
-                                except FileNotFoundError:
-                                    accelerator.print(f'removing file failed, not found eror: {remove_file}')
+                        checkpoint_dir = os.path.join(config.output_dir, f"epoch_{epoch}_step_{step}_loss_{val_loss_npy}")
+                        accelerator.print(f'Saving checkpoint:{checkpoint_dir}, pdir:{os.path.isdir(config.output_dir)}, epoch:{epoch}, step:{step}, loss:{val_loss_npy}\n Loss trcker:{val_loss_tracker}')
+                        try:
 
+                            unwrapped_model.save_pretrained(
+                                checkpoint_dir,
+                                is_main_process=accelerator.is_main_process,
+                                save_function=accelerator.save,
+                                state_dict=accelerator.get_state_dict(model),
+                            )
+                            tokenizer.save_pretrained(checkpoint_dir)
+                        except Exception as e:
+                            accelerator.print(f'Error while saving cp: {checkpoint_dir}')
+                    if step % (2 * config.eval_every) == 0 and os.path.isdir(config.output_dir):
+                        with accelerator.main_process_first():
+                            keep_files, remove_files = manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch, epoch)   
+                            if len(remove_files) > 0:
+                                accelerator.print(f'keep epoch files: {keep_files}\nremove epoch files: {remove_files}')
+                                for remove_file in remove_files:
+                                    try:
+                                        shutil.rmtree(remove_file)
+                                    except FileNotFoundError:
+                                        accelerator.print(f'removing file failed, not found eror: {remove_file}')
                     
                 val_loss_tracker.append(val_loss_npy) 
 
