@@ -117,7 +117,7 @@ def test_tokenizer(
     cutoff_len: int,
     train_on_inputs: bool,
     sample_ids:list,
-    prompt_template_file_name:str,
+    prompter_name:str,
     group_by_length: bool
 ):
     old_len = len(tokenizer)
@@ -130,7 +130,7 @@ def test_tokenizer(
     #                                                   train_on_inputs=train_on_inputs, 
     #                                                   select_samples=sample_ids)
 
-    prompter = get_prompter(prompt_template_file_name, tokenizer, train_on_inputs, cutoff_len, 0.2)
+    prompter = get_prompter(prompter_name, tokenizer, train_on_inputs, cutoff_len, 0.2)
     print(type(prompter))
     train_data, val_data = load_tokenized_conversation_dataset(
         prompter,

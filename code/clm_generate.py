@@ -48,21 +48,17 @@ def main(
     share_gradio: bool = False,
     template_file: str = None,
 ):
-    assert model_name_or_path, (
-        "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
-    )
+    assert model_name_or_path, ("Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'")
     if lora:
         assert os.path.isdir(
             lora_weights), ("Please specify a --lora_weights, e.g. --lora_weights='tloen/alpaca-lora-7b'")
         print(
             f'base model=========>: {model_name_or_path}\nlora weights==========>: {lora_weights}')
 
-
     if not tokenizer_name_or_path:
         tokenizer_name_or_path = model_name_or_path
 
-    if not template_file:
-        raise AssertionError(f'Please specify a template file for Prompter')
+    assert os.path.isfile(template_file), f'Please specify a template file for Prompter'
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path)
     if device == "cuda":
         print('cuda')
@@ -161,10 +157,11 @@ def main(
         s = generation_output.sequences[0]
         output = tokenizer.decode(
             s, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+        input_raw = tokenizer.decode(input_ids[0])
         print('-'*40)
-        print(f'inputs decode:{tokenizer.decode(input_ids[0])}')
+        print(f'inputs decode:{input_raw}')
         print(f'raw_output:\n{output}')
-        format_out = prompter.format_response(output, prompt=prompt)
+        format_out = prompter.format_response(output, prompt=input_raw)
         model_name = lora_weights if lora else os.path.basename(state_dict_path)
         model_name = model_name if model_name else model_name_or_path
         if test_output_file:
@@ -194,52 +191,6 @@ def main(
             writer = open(test_output_file, "a+")
         for item in left_msgs:
             evaluate(item)
-    else:
-        def evaluate_single(
-            instruction: str,
-            input_str: str = '',
-            role: str = 'Assistant',
-            temperature=0.8,
-            top_p=1,
-            top_k=40,
-            num_beams=4,
-            max_new_tokens=1024
-        ):
-            data_point = {'instruction': instruction, 'input': input_str,
-                          'output': '', 'target': '', 'role': role}
-            return evaluate(data_point, temperature, top_p, top_k, num_beams, max_new_tokens)
-        gr.Interface(
-            fn=evaluate_single,
-            inputs=[
-                gr.components.Textbox(
-                    lines=2, label="Instruction", placeholder="Tell me about alpacas."
-                ),
-                gr.components.Textbox(
-                    lines=2, label="Input", placeholder="none"),
-                gr.components.Textbox(
-                    lines=2, label="role", placeholder="Assistant"),
-                gr.components.Slider(minimum=0, maximum=1,
-                                     value=0.1, label="Temperature"),
-                gr.components.Slider(minimum=0, maximum=1,
-                                     value=0.75, label="Top p"),
-                gr.components.Slider(
-                    minimum=0, maximum=100, step=1, value=40, label="Top k"
-                ),
-                gr.components.Slider(minimum=1, maximum=4,
-                                     step=1, value=4, label="Beams"),
-                gr.components.Slider(
-                    minimum=1, maximum=2000, step=1, value=128, label="Max tokens"
-                ),
-            ],
-            outputs=[
-                gr.inputs.Textbox(
-                    lines=5,
-                    label="Output",
-                )
-            ],
-            title="🦙🌲 Alpaca-LoRA-XiaoDuo-v0.1",
-            description=f"基于 7B LLaMA 模型:{lora_weights}",
-        ).queue().launch(server_name=server_name, share=share_gradio)
 
 
 
