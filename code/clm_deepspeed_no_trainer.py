@@ -26,7 +26,7 @@ from peft import get_peft_model, LoraConfig, TaskType, prepare_model_for_int8_tr
 from tqdm import tqdm
 from torchmetrics import MeanMetric
 from torch.utils.data import DataLoader
-from transformers import DefaultDataCollator, LlamaForCausalLM, LlamaTokenizer
+from transformers import DefaultDataCollator, LlamaForCausalLM, LlamaTokenizer, MistralForCausalLM
 from pydantic import BaseModel
 from typing import Union, List
 import math
@@ -131,7 +131,7 @@ def train(accelerator, config: TrainArgs):
 
     checkpoint = config.gradient_checkpointing
     # A device map needs to be passed to run convert models into mixed-int8 format. Please run`.from_pretrained` with `device_map='auto'
-    model = AutoModelForCausalLM.from_pretrained(
+    model = MistralForCausalLM.from_pretrained(
         config.model_name,
         use_cache=False if checkpoint else True,
         torch_dtype=torch.float16,
