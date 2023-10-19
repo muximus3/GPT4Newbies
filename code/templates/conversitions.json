@@ -1,5 +1,5 @@
 {
     "description": "",
     "prompt": "System:\n{system}\n\nHuman:\n{instruction}\n\nAssistant:\n",
-    "prompt_no_system": "Human:\n{instruction}\n\nnAssistant:\n"
+    "prompt_no_system": "Human:\n{instruction}\n\nAssistant:\n"
 }
