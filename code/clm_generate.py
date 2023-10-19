@@ -159,9 +159,9 @@ def main(
             s, skip_special_tokens=True, clean_up_tokenization_spaces=True)
         input_raw = tokenizer.decode(input_ids[0])
         print('-'*40)
-        print(f'inputs decode:{input_raw}')
+        print(f'inputs decode:\n{input_raw}')
         print(f'raw_output:\n{output}')
-        format_out = prompter.format_response(output, prompt=input_raw)
+        format_out = prompter.format_response(output, prompt=prompt)
         model_name = lora_weights if lora else os.path.basename(state_dict_path)
         model_name = model_name if model_name else model_name_or_path
         if test_output_file:
