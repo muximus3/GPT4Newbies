@@ -242,15 +242,15 @@ def main(**kargs):
 
 
 if __name__ == "__main__":
-    # fire.Fire(main)
-    dataset_path = (
-        "/data/zhangchong/train_data/open_domain_prompt_zh/compareset_13w.jsonl"
-    )
-    train_dataset, val_dataset = load_compare_dataset(dataset_path, 200)
-    select = train_dataset.shuffle(seed=42).select(range(10))
-    item = next(iter(select))
-    print(item["prompt"])
-    print('--------------------------------------')
-    print(item["chosen"])
-    print('--------------------------------------')
-    print(item["rejected"])
+    fire.Fire(main)
+    # dataset_path = (
+    #     "/data/zhangchong/train_data/open_domain_prompt_zh/compareset_13w.jsonl"
+    # )
+    # train_dataset, val_dataset = load_compare_dataset(dataset_path, 200)
+    # select = train_dataset.shuffle(seed=42).select(range(10))
+    # item = next(iter(select))
+    # print(item["prompt"])
+    # print('--------------------------------------')
+    # print(item["chosen"])
+    # print('--------------------------------------')
+    # print(item["rejected"])
