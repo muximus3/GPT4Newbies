@@ -122,14 +122,6 @@ def test_tokenizer(
 ):
     old_len = len(tokenizer)
     prebuild_tokenizer(tokenizer)
-    # train_data, val_data = load_tokenized_dataset_alpaca(tokenizer=tokenizer, 
-    #                                                   dataset_paths=dataset_paths, 
-    #                                                   val_set_size=0, 
-    #                                                   template_file=prompt_template_file_name,
-    #                                                   cutoff_len=cutoff_len,
-    #                                                   train_on_inputs=train_on_inputs, 
-    #                                                   select_samples=sample_ids)
-
     prompter = get_prompter(prompter_name, tokenizer, train_on_inputs, cutoff_len, 0.2)
     print(type(prompter))
     train_data, val_data = load_tokenized_conversation_dataset(
@@ -168,7 +160,7 @@ def main(
     prompter_name: str = "llama",
     cut_off_len: int = 100,
     train_on_inputs: bool = False,
-    sample_ids: list = [1230, 2394, 2332, 9],
+    sample_ids: list = None,
     group_by_length: bool = False
     
 ):
@@ -191,7 +183,3 @@ def main(
 
 if __name__ == "__main__":
     fire.Fire(main)
-
-
-
-

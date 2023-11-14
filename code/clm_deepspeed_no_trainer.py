@@ -131,7 +131,7 @@ def train(accelerator, config: TrainArgs):
 
     checkpoint = config.gradient_checkpointing
     # A device map needs to be passed to run convert models into mixed-int8 format. Please run`.from_pretrained` with `device_map='auto'
-    model = MistralForCausalLM.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
         config.model_name,
         use_cache=False if checkpoint else True,
         torch_dtype=torch.float16,
@@ -325,40 +325,7 @@ def train(accelerator, config: TrainArgs):
 
                 log_train = {"train_loss": train_loss.compute()}
                 log_val = {"val_loss": val_loss.compute()}
-
-                # save best model
-                val_loss_npy = np.round(log_val["val_loss"].cpu().numpy(), 3)
-                if step >= (0.98 * (1 - epoch/config.num_epochs)) * len(train_dataloader) and len(val_loss_tracker) > 0:
-                    no_cp_for_current_epoch = step >= len(train_dataloader) - 1 and len(find_files_unrecu(config.output_dir, f'epoch_{epoch}_*')) == 0
-                    if  val_loss_npy < min(val_loss_tracker) or no_cp_for_current_epoch:
-                        accelerator.wait_for_everyone()
-                        unwrapped_model = accelerator.unwrap_model(model)
-                        checkpoint_dir = os.path.join(config.output_dir, f"epoch_{epoch}_step_{step}_loss_{val_loss_npy}")
-                        accelerator.print(f'Saving checkpoint:{checkpoint_dir}, pdir:{os.path.isdir(config.output_dir)}, epoch:{epoch}, step:{step}, loss:{val_loss_npy}\n Loss trcker:{val_loss_tracker}')
-                        try:
-
-                            unwrapped_model.save_pretrained(
-                                checkpoint_dir,
-                                is_main_process=accelerator.is_main_process,
-                                save_function=accelerator.save,
-                                state_dict=accelerator.get_state_dict(model),
-                            )
-                            tokenizer.save_pretrained(checkpoint_dir)
-                        except Exception as e:
-                            accelerator.print(f'Error while saving cp: {checkpoint_dir}')
-                    if step % (2 * config.eval_every) == 0 and os.path.isdir(config.output_dir):
-                        with accelerator.main_process_first():
-                            keep_files, remove_files = manage_checkpoint_files(config.output_dir, config.max_to_keep_per_epoch, epoch)   
-                            if len(remove_files) > 0:
-                                accelerator.print(f'keep epoch files: {keep_files}\nremove epoch files: {remove_files}')
-                                for remove_file in remove_files:
-                                    try:
-                                        shutil.rmtree(remove_file)
-                                    except FileNotFoundError:
-                                        accelerator.print(f'removing file failed, not found eror: {remove_file}')
-                    
-                val_loss_tracker.append(val_loss_npy) 
-
+                
                 if config.wandb:
                     curr_step = step + epoch * len(train_dataloader)
                     accelerator.log({**log_train, **log_val}, step=curr_step)
@@ -368,6 +335,22 @@ def train(accelerator, config: TrainArgs):
                 accelerator.print(format_metrics(log_val, "val", f" step {step} "))
 
                 train_loss.reset()
+
+            if epoch > 0 and step == int(0.499 * len(train_dataloader)):
+                accelerator.wait_for_everyone()
+                unwrapped_model = accelerator.unwrap_model(model)
+                checkpoint_dir = os.path.join(config.output_dir, f"epoch_{epoch}_step_{step}")
+                accelerator.print(f'Saving checkpoint:{checkpoint_dir}, pdir:{os.path.isdir(config.output_dir)}, epoch:{epoch}, step:{step}')
+                try:
+                    unwrapped_model.save_pretrained(
+                        checkpoint_dir,
+                        is_main_process=accelerator.is_main_process,
+                        save_function=accelerator.save,
+                        state_dict=accelerator.get_state_dict(model),
+                    )
+                    tokenizer.save_pretrained(checkpoint_dir)
+                except Exception as e:
+                    accelerator.print(f'Error while saving cp: {checkpoint_dir}')
         # in case of warning: pytorch allocator cache flushes since last step. \
         # this happens when there is high memory pressure and is detrimental to performance.
         # if this is happening frequently consider adjusting settings to reduce memory consumption.

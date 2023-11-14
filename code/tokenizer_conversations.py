@@ -31,6 +31,7 @@ def prebuild_tokenizer(tokenizer, model=None, padding_side="right"):
     origin_tokenizer_len = len(tokenizer)
     if tokenizer.pad_token is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
+        padding_side = "right"
     # tokenizer.bos_token_id = 1
     # tokenizer.eos_token_id = 2
     tokenizer.padding_side = padding_side
