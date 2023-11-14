@@ -92,7 +92,6 @@ def format_metrics(metrics, split, prefix=""):
 
     return log
 
-
 def evaluate(model, val_dataloader, accelerator):
     model.eval()
     val_loss = MeanMetric(nan_strategy="error").to(model.device)
@@ -106,20 +105,6 @@ def evaluate(model, val_dataloader, accelerator):
             val_loss.update(loss_values["loss"])
 
     return val_loss
-
-def manage_checkpoint_files(output_dir, epoch, max_to_keep_per_epoch=1):
-    # Use regex to parse filename
-    files = find_files_unrecu(output_dir, f'epoch_{epoch}_*')
-    files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-    if len(files) > max_to_keep_per_epoch:
-        keep_files = files[:max_to_keep_per_epoch]
-        remove_files = files[max_to_keep_per_epoch:]
-        return keep_files, remove_files
-    else:
-        return files, []
-
-
-
 
 def train(accelerator, config: TrainArgs):
     set_seed(config.seed)

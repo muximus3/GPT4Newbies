@@ -1,6 +1,6 @@
 #GPT4Newbies
 
-![Progress](https://progress-bar.dev/30/?title=Progress)
+![Progress](https://progress-bar.dev/50/?title=Progress)
 
 - [x] Training code.
 - [x] Evaluation code.
