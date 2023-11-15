@@ -167,7 +167,7 @@ def main(
     assert base_model, (
         "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
     )
-    tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True, model_max_length=cut_off_len)
     kargs = {
         "dataset_paths": dataset_paths, 
         "tokenizer": tokenizer, 

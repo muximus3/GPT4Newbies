@@ -1,22 +1,10 @@
-# -*- coding: utf-8 -*-
-# @Time    : 2023/05/25 19:22
-# @Author  : zhangchong
-# @Site    :
-# @File    : scp_util.py
-# @Software: Code
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 import os
 import sys
-import numpy as np
 import logging
 import asyncio
 import asyncssh
 import tqdm
 from fire import Fire
-
-sys.path.append(os.path.normpath(f"{os.path.dirname(os.path.abspath(__file__))}/.."))
 logger = logging.getLogger(__name__)
 
 def pretty_file_size(size_bytes):
@@ -180,7 +168,7 @@ async def scp_main(
 def main(
 **kwargs
 ):
-    print(f'Scp task: \nFrom:{kwargs["src_path"]}\nTo=>:{kwargs["dest_path"]}\nHost:{kwargs["host"]}\nPort:{kwargs["port"]}\nUsername:{kwargs["username"]}\nPassword:{kwargs["password"]}\n')
+    print(f'Scp task: \nFrom:{kwargs["src"]}\nTo=>:{kwargs["dest"]}\nHost:{kwargs["host"]}\nPort:{kwargs["port"]}\nUsername:{kwargs["username"]}\nPassword:{kwargs["password"]}\n')
     print('Start scp task')
     asyncio.run(scp_main(**kwargs))
 
