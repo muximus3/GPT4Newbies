@@ -114,9 +114,8 @@ def train(accelerator, config: TrainArgs):
 
     tokenizer = AutoTokenizer.from_pretrained(
         config.tokenizer_name,
-        use_fast=False,
+        # use_fast=False,
         trust_remote_code=True,
-        model_max_length=config.max_length,
     )
 
     checkpoint = config.gradient_checkpointing
