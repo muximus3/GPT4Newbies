@@ -53,10 +53,10 @@ def print_sample(batch_examples, tokenizer: transformers.PreTrainedTokenizer, sk
         input_ids_masked = torch.masked_select(input_ids, mask == 0)
         masked_one = torch.masked_select(mask, mask == 1)
         masked_zero = torch.masked_select(mask, mask == 0)
-        label_masked = torch.masked_select(label, label == -100)
-        label_no_mask = torch.masked_select(label, label != -100)
-        input_ids_masked_by_label = torch.masked_select(input_ids, label == -100)
-        input_ids_no_masked_by_label = torch.masked_select(input_ids, label != -100)
+        label_ignore = torch.masked_select(label, label == -100)
+        label_not_ignore = torch.masked_select(label, label != -100)
+        input_ids_ignored_by_label = torch.masked_select(input_ids, label == -100)
+        input_ids_not_ignored_by_label = torch.masked_select(input_ids, label != -100)
 
 
         print_info = {
@@ -64,11 +64,11 @@ def print_sample(batch_examples, tokenizer: transformers.PreTrainedTokenizer, sk
             "input_ids_no_pad": (input_ids_no_pad, len(input_ids_no_pad)),
             "input_ids_no_mask": (input_ids_no_mask, len(input_ids_no_mask)),
             "input_ids_masked": (input_ids_masked, len(input_ids_masked)),
-            "input_ids_masked_by_label (expect prompts + pad)": (input_ids_masked_by_label, len(input_ids_masked_by_label)),
-            "input_ids_no_masked_by_label (expect label)": (input_ids_no_masked_by_label, len(input_ids_no_masked_by_label)),
+            "input_ids_ignored_by_label (expect prompts + pad)": (input_ids_ignored_by_label, len(input_ids_ignored_by_label)),
+            "input_ids_not_ignored_by_label (expect label)": (input_ids_not_ignored_by_label, len(input_ids_not_ignored_by_label)),
             "label": (label, len(label)),
-            "label_masked": (label_masked, len(label_masked)),
-            "label_no_mask": (label_no_mask, len(label_no_mask)),
+            "label_ignore": (label_ignore, len(label_ignore)),
+            "label_not_ignore": (label_not_ignore, len(label_not_ignore)),
             "mask": (mask, len(mask)),
             "masked_zero": (masked_zero, len(masked_zero)),
             "masked_one": (masked_one, len(masked_one)),
@@ -84,9 +84,9 @@ def print_sample(batch_examples, tokenizer: transformers.PreTrainedTokenizer, sk
             "input_ids_no_pad (expect full text without pad)": tokenizer.decode(input_ids_no_pad, skip_special_tokens=skip_s),
             "input_ids_no_mask (expect full text without attention_mask)": tokenizer.decode(input_ids_no_mask, skip_special_tokens=skip_s),
             "input_text_masked (expect masked tokens with attention_mask)": tokenizer.decode(input_ids_masked, skip_special_tokens=skip_s),
-            "label_no_mask (expect label)": tokenizer.decode(label_no_mask, skip_special_tokens=skip_s),
-            "input_ids_masked_by_label (expect masked ids)": tokenizer.decode(input_ids_masked_by_label, skip_special_tokens=skip_s),
-            "input_ids_no_masked_by_label (expect label)": tokenizer.decode(input_ids_no_masked_by_label, skip_special_tokens=skip_s),
+            "label_not_ignore (expect label)": tokenizer.decode(label_not_ignore, skip_special_tokens=skip_s),
+            "input_ids_ignored_by_label (expect ignored ids)": tokenizer.decode(input_ids_ignored_by_label, skip_special_tokens=skip_s),
+            "input_ids_not_ignored_by_label (expect label)": tokenizer.decode(input_ids_not_ignored_by_label, skip_special_tokens=skip_s),
         }
 
         for key, value in decoded_texts.items():
@@ -160,14 +160,14 @@ def main(
     prompter_name: str = "llama",
     cut_off_len: int = 100,
     train_on_inputs: bool = False,
-    sample_ids: list = None,
+    sample_ids: list = [0,10,20000],
     group_by_length: bool = False
     
 ):
     assert base_model, (
         "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
     )
-    tokenizer = AutoTokenizer.from_pretrained(base_model)
+    tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
     kargs = {
         "dataset_paths": dataset_paths, 
         "tokenizer": tokenizer, 

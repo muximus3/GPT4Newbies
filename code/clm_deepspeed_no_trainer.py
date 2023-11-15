@@ -112,7 +112,11 @@ def train(accelerator, config: TrainArgs):
     accelerator.print(config)
     accelerator.print(f"Using {accelerator.num_processes} GPUs")
 
-    tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_name)
+    tokenizer = AutoTokenizer.from_pretrained(
+        config.tokenizer_name,
+        use_fast=False,
+        trust_remote_code=True,
+    )
 
     checkpoint = config.gradient_checkpointing
     # A device map needs to be passed to run convert models into mixed-int8 format. Please run`.from_pretrained` with `device_map='auto'
@@ -121,6 +125,7 @@ def train(accelerator, config: TrainArgs):
         use_cache=False if checkpoint else True,
         torch_dtype=torch.float16,
         # device_map="auto",
+        trust_remote_code=True,
     )
 
     prebuild_tokenizer(tokenizer, model, padding_side=config.padding_side)
@@ -195,6 +200,7 @@ def train(accelerator, config: TrainArgs):
         * accelerator.num_processes
         * gradient_accumulation_steps
     )
+    # iterate steps per epoch show in progressbar
     steps_per_epoch = math.ceil(len(train_dataloader) / accelerator.num_processes)
     total_num_steps = steps_per_epoch * config.num_epochs
     # train_batch_size equal to micro_batch_per_gpu * gradient_acc_step * world_size
@@ -260,18 +266,16 @@ def train(accelerator, config: TrainArgs):
     if accelerator.is_main_process and config.wandb:
         wandb.watch(model, log_freq=config.log_grads_every, log="all")
     for epoch in range(config.num_epochs):
-        val_loss_tracker = []
         train_loss = MeanMetric(nan_strategy="error").to(model.device)
         # len(train_dataloader) == steps_per_epoch
         for step, batch in enumerate(tqdm(train_dataloader)):
+            curr_step = step + epoch * len(train_dataloader)
             model.train()
             outputs = model(**batch)
             loss = outputs.loss
 
             # gather loss before backprop in case of gradient accumulation
-            loss_values = accelerator.gather_for_metrics(
-                {"loss": loss.detach().float()}
-            )
+            loss_values = accelerator.gather_for_metrics({"loss": loss.detach().float()})
             train_loss.update(loss_values["loss"])
 
             loss = loss / gradient_accumulation_steps
@@ -281,29 +285,19 @@ def train(accelerator, config: TrainArgs):
             # log LR in case something weird happens
             if step > 0 and step % (config.eval_every // 10) == 0:
                 if config.wandb:
-                    curr_step = step + epoch * len(train_dataloader)
                     accelerator.log({"lr": scheduler.get_last_lr()[0]}, step=curr_step)
 
-            if (step + 1) % gradient_accumulation_steps == 0 or step == len(
-                train_dataloader
-            ) - 1:
+            if (step + 1) % gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
 
             if (step + 1) % config.print_loss_every == 0:
-                accelerator.print(
-                    f"Epoch:{epoch}, step:{step}, loss:{train_loss.compute()}"
-                )
+                accelerator.print(f"Epoch:{epoch}, step:{step}, loss:{train_loss.compute()}")
                 if config.wandb:
-                    curr_step = step + epoch * len(train_dataloader)
-                    accelerator.log(
-                        {"train_loss": train_loss.compute()}, step=curr_step
-                    )
+                    accelerator.log({"train_loss": train_loss.compute()}, step=curr_step)
 
-            if step > 0 and (
-                step % config.eval_every == 0 or step == len(train_dataloader) - 1
-            ):
+            if step > 0 and (step % config.eval_every == 0 or step == len(train_dataloader) - 1):
                 # assert len(train_dataloader) == steps_per_epoch
                 # accelerator.print(f'Eval Epoch: {epoch}, step:{step}, data_loader_size:{len(train_dataloader)}, steps_per_epoch:{steps_per_epoch}')
                 val_loss = evaluate(model, val_dataloader, accelerator)
@@ -312,7 +306,6 @@ def train(accelerator, config: TrainArgs):
                 log_val = {"val_loss": val_loss.compute()}
                 
                 if config.wandb:
-                    curr_step = step + epoch * len(train_dataloader)
                     accelerator.log({**log_train, **log_val}, step=curr_step)
 
                 accelerator.print(f"Current LR: {scheduler.get_last_lr()[0]}")
@@ -322,6 +315,7 @@ def train(accelerator, config: TrainArgs):
                 train_loss.reset()
 
             if epoch > 0 and step == int(0.499 * len(train_dataloader)):
+                # remove this?
                 accelerator.wait_for_everyone()
                 unwrapped_model = accelerator.unwrap_model(model)
                 checkpoint_dir = os.path.join(config.output_dir, f"epoch_{epoch}_step_{step}")
@@ -340,10 +334,11 @@ def train(accelerator, config: TrainArgs):
         # this happens when there is high memory pressure and is detrimental to performance.
         # if this is happening frequently consider adjusting settings to reduce memory consumption.
         # If you are unable to make the cache flushes go away consider adding get_accelerator().empty_cache() calls in your training loop to ensure that all ranks flush their caches at the same time
-        # get_accelerator().empty_cache()
+        get_accelerator().empty_cache()
 
         accelerator.print(f"Epoch {epoch} finished")
-        # accelerator.print(f"Saving checkpoint to:{config.output_dir}")
+        accelerator.print(f"Saving checkpoint to:{config.output_dir}")
+        # remove this?
         accelerator.wait_for_everyone()
         unwrapped_model = accelerator.unwrap_model(model)
         unwrapped_model.save_pretrained(
