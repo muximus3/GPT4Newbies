@@ -231,8 +231,8 @@ def train(accelerator, config: TrainArgs):
         accelerator.print("linear schedule")
         scheduler = get_linear_schedule_with_warmup(
             optimizer=optimizer,
-            num_warmup_steps=config.warmup_steps * 2,
-            num_training_steps=total_num_steps * 2,
+            num_warmup_steps=config.warmup_steps,
+            num_training_steps=total_num_steps,
         )
         # scheduler = get_scheduler(
         #     name=config.lr_scheduler_type,
