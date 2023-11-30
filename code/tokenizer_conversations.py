@@ -47,7 +47,7 @@ class ConversationPrompter:
     # {'human': 4438666, 'gpt': 413497, 'bing': 128, 'chatgpt': 427, 'bard': 8, 'assistant': 4024539}
     AI = ('ai', 'assistant', 'bing', 'gpt', 'bard', 'chatgpt', 'claude')
     SYS = 'system'
-    def __init__(self, tokenizer, train_on_inputs=False, cutoff_len=512, complete_alpha=0.6, system_prompt_tmp = 'System:\n', human_prompt_tmp = '\n\nHuman:\n', ai_prompt_tmp = '\n\nAssistant:\n'):
+    def __init__(self, tokenizer, train_on_inputs=False, cutoff_len=512, complete_alpha=0.2, system_prompt_tmp = 'System:\n', human_prompt_tmp = '\n\nHuman:\n', ai_prompt_tmp = '\n\nAssistant:\n'):
         self.tokenizer = tokenizer
         self.train_on_inputs = train_on_inputs
         self.cutoff_len = cutoff_len
@@ -93,6 +93,7 @@ class ConversationPrompter:
         # add eos token
         inputs_ids.append(self.tokenizer.eos_token_id)
         labels.append(self.tokenizer.eos_token_id)
+        # learn response only, mask the speaker name
         if not self.train_on_inputs:
             labels[:ai_prompt_len] = [-100] * ai_prompt_len
         return {"input_ids": inputs_ids, "labels": labels}
@@ -163,7 +164,7 @@ class ConversationPrompter:
             #     labels[-1] = -100
         # all label ids are -100, we set to empty and filter later
         if labels.count(-100) == len(labels):
-            inputs_ids = []
+            labels[20:50] = inputs_ids[20:50]
         attention_mask = [1] * len(inputs_ids)
         return {"input_ids": inputs_ids, "labels": labels, "attention_mask": attention_mask}
    
