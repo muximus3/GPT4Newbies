@@ -91,6 +91,16 @@ def load_json(data_path: str):
     with open(data_path, "r", encoding='utf8') as openfile:
         return json.load(openfile)
 
+def save_jsonl(obj_list, data_path: str, mode='w+', ensure_ascii=False):
+    with open(data_path, mode=mode, newline='') as writer:
+        if isinstance(obj_list, list):
+            for i, data in enumerate(obj_list):
+                if isinstance(data, dict):
+                    writer.write(f'{json.dumps(data, ensure_ascii=ensure_ascii)}\n')
+                else:
+                    raise AssertionError(f'not support type:{type(data)}, line:{i}, data detail:{data}')
+        elif isinstance(obj_list, str):
+            writer.write(obj_list)
         
 def find_files_unrecu(directory, pattern):
     """ finds all files matching the pattern."""

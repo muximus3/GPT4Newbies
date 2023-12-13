@@ -31,6 +31,7 @@ from pydantic import BaseModel
 from typing import Union, List
 import math
 import fire
+from bs_finder import BSFinder
 import wandb
 
 sys.path.append(os.path.normpath(f"{os.path.dirname(os.path.abspath(__file__))}/.."))
@@ -40,7 +41,7 @@ from tokenizer_conversations import (
     load_tokenized_conversation_dataset,
     get_prompter
 )
-from data_utils import find_files_unrecu
+from data_utils import find_files_unrecu, save_jsonl
 
 torch.backends.cuda.matmul.allow_tf32 = True
 
@@ -200,6 +201,7 @@ def train(accelerator, config: TrainArgs):
         * accelerator.num_processes
         * gradient_accumulation_steps
     )
+
     # iterate steps per epoch show in progressbar
     steps_per_epoch = math.ceil(len(train_dataloader) / accelerator.num_processes)
     total_num_steps = steps_per_epoch * config.num_epochs
@@ -213,6 +215,8 @@ def train(accelerator, config: TrainArgs):
     total_num_steps += int(total_num_steps * lr_ratio) + math.ceil(config.warmup_steps / 2)
     # eval_every 
     config.eval_every = int(min(config.eval_every, max(steps_per_epoch / 100, 20)))
+    # bs_big = bs_small * n_batch  should we conside the gradient accumulation steps?
+    bsfinder = BSFinder(bs=config.micro_batch_size * accelerator.num_processes, num_it=steps_per_epoch, n_batch=gradient_accumulation_steps)
     
     accelerator.print(f"Accelerate state:\n\n{AcceleratorState()}\n")
     accelerator.print(f"Dataloader * micro_batch_size: {dataset_size}")
@@ -291,7 +295,8 @@ def train(accelerator, config: TrainArgs):
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
-
+            # noise scale 
+            bsfinder.on_backward_end(model, step)
             if (step + 1) % config.print_loss_every == 0:
                 accelerator.print(f"Epoch:{epoch}, step:{step}, loss:{train_loss.compute()}")
                 if config.wandb:
@@ -338,6 +343,8 @@ def train(accelerator, config: TrainArgs):
 
         accelerator.print(f"Epoch {epoch} finished")
         accelerator.print(f"Saving checkpoint to:{config.output_dir}")
+
+        save_jsonl(bsfinder.output, f'{config.output_dir}/epoch_{epoch}_bsfinder.jsonl')
         # remove this?
         accelerator.wait_for_everyone()
         unwrapped_model = accelerator.unwrap_model(model)
