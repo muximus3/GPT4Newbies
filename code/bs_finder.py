@@ -6,14 +6,17 @@ import numpy as np
 def get_flatten_grad(model):
     """Return the flattened parameter of a model,
     returns a (n,1) tensor with the total number of parameters"""
-
     parameters = list(model.parameters())
+    print(f"Number len of parameters: {len(parameters)}")
     grads = [
         param.grad.flatten().view(-1, 1)
         for param in parameters
         if not type(param.grad) == type(None)
     ]
-    grad = torch.cat(grads)
+    try: 
+        grad = torch.cat(grads)
+    except Exception as e:
+        grad = None
     return grad
 
 
@@ -46,12 +49,14 @@ class BSFinder:
         # We create the list which will store the data
         self.output = []
 
-    def on_backward_end(self, model, iteration: int, **kwargs) -> None:
+    def on_backward_end(self, model, iteration: int, **kwargs) -> str:
         if iteration >= self.num_it:
-            return {"stop_epoch": True, "stop_training": True}
+            return "strop_epoch"
 
         # First we grab the gradient
         grad = get_flatten_grad(model)
+        if not grad:
+            return "no grad"
         self.batches.append(grad)
 
         if iteration % self.n_batch == self.n_batch - 1:
@@ -84,9 +89,11 @@ class BSFinder:
             self.output.append(
                 {"noise": noise, "scale": scale, "noise_scale": noise_scale}
             )
+            return f"{noise_scale}"
 
     def on_train_end(self, **kwargs) -> None:
         "Cleanup learn model weights disturbed during exploration."
+        self.batches = []
         pass
 
     def plot(self):
