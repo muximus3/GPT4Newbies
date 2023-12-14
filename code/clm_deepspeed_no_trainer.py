@@ -296,9 +296,9 @@ def train(accelerator, config: TrainArgs):
                 scheduler.step()
                 optimizer.zero_grad()
             # noise scale 
-            bsfinder.on_backward_end(accelerator.unwrap_model(model), step)
+            status = bsfinder.on_backward_end(accelerator.unwrap_model(model), step)
             if (step + 1) % config.print_loss_every == 0:
-                accelerator.print(f"Epoch:{epoch}, step:{step}, loss:{train_loss.compute()}")
+                accelerator.print(f"Epoch:{epoch}, step:{step}, loss:{train_loss.compute()}, bsfinder status:{status}")
                 if config.wandb:
                     accelerator.log({"train_loss": train_loss.compute()}, step=curr_step)
 
