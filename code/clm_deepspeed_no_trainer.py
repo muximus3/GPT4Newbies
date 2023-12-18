@@ -236,7 +236,7 @@ def train(accelerator, config: TrainArgs):
         scheduler = get_linear_schedule_with_warmup(
             optimizer=optimizer,
             num_warmup_steps=config.warmup_steps,
-            num_training_steps=total_num_steps,
+            num_training_steps=steps_per_epoch,
         )
         # scheduler = get_scheduler(
         #     name=config.lr_scheduler_type,
@@ -295,8 +295,8 @@ def train(accelerator, config: TrainArgs):
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
+                status = bsfinder.on_backward_end(accelerator.unwrap_model(model), step)
             # noise scale 
-            status = bsfinder.on_backward_end(accelerator.unwrap_model(model), step)
             if (step + 1) % config.print_loss_every == 0:
                 accelerator.print(f"Epoch:{epoch}, step:{step}, loss:{train_loss.compute()}, bsfinder status:{status}")
                 if config.wandb:
@@ -344,7 +344,6 @@ def train(accelerator, config: TrainArgs):
         accelerator.print(f"Epoch {epoch} finished")
         accelerator.print(f"Saving checkpoint to:{config.output_dir}")
 
-        save_jsonl(bsfinder.output, f'{config.output_dir}/epoch_{epoch}_bsfinder.jsonl')
         # remove this?
         accelerator.wait_for_everyone()
         unwrapped_model = accelerator.unwrap_model(model)
@@ -355,6 +354,7 @@ def train(accelerator, config: TrainArgs):
             state_dict=accelerator.get_state_dict(model),
         )
         tokenizer.save_pretrained(f"{config.output_dir}/epoch_{epoch}")
+        save_jsonl(bsfinder.output, f'{config.output_dir}/epoch_{epoch}_bsfinder.jsonl')
         # try:
         #     if accelerator.is_main_process and config.save_name:
         #         unwrapped_model.push_to_hub(config.save_name + f"-epoch_{epoch}", private=True)
